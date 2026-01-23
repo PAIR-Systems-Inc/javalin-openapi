@@ -1,73 +1,81 @@
 package io.javalin.openapi.experimental.processor.generators
 
+import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import com.google.gson.JsonNull
+import com.google.gson.JsonPrimitive
+import io.javalin.openapi.ExampleValueType
 import io.javalin.openapi.NULL_STRING
 import io.javalin.openapi.OpenApiExampleProperty
+import java.math.BigDecimal
 
 object ExampleGenerator {
 
     data class ExampleProperty(
         val name: String?,
         val value: String?,
+        val type: ExampleValueType,
         val objects: List<ExampleProperty>?
     )
 
     fun OpenApiExampleProperty.toExampleProperty(): ExampleProperty =
-        ExampleProperty(this.name, this.value, this.objects.map { it.toExampleProperty() })
+        ExampleProperty(this.name, this.value, this.type, this.objects.map { it.toExampleProperty() })
 
-    data class GeneratorResult(val simpleValue: String?, val jsonElement: JsonElement?) {
-        init {
-            when {
-                simpleValue != null && jsonElement != null -> throw IllegalArgumentException("rawList and jsonElement cannot be both non-null")
-                simpleValue == null && jsonElement == null -> throw IllegalArgumentException("rawList and jsonElement cannot be both null")
-            }
-        }
-    }
-
-    fun generateFromExamples(examples: List<ExampleProperty>): GeneratorResult {
+    fun generateFromExamples(examples: List<ExampleProperty>): JsonElement {
         if (examples.isRawList()) {
             val jsonArray = JsonArray()
-            examples.forEach { jsonArray.add(it.value) }
-            return GeneratorResult(null, jsonArray)
+            examples.forEach { jsonArray.add(it.toJsonElement()) }
+            return jsonArray
         }
 
         if (examples.isObjectList()) {
             val jsonArray = JsonArray()
-            examples.forEach { jsonArray.add(it.toSimpleExampleValue().jsonElement!!) }
-            return GeneratorResult(null, jsonArray)
+            examples.forEach { jsonArray.add(it.toJsonElement()) }
+            return jsonArray
         }
 
-        return GeneratorResult(null, examples.toJsonObject())
+        return examples.toJsonObject()
     }
 
-    private fun ExampleProperty.toSimpleExampleValue(): GeneratorResult =
+    private fun ExampleProperty.toJsonElement(): JsonElement =
         when {
-            this.value != NULL_STRING -> GeneratorResult(this.value, null)
-            this.objects?.isNotEmpty() == true-> GeneratorResult(null, objects.toJsonObject())
+            this.type == ExampleValueType.NULL -> JsonNull.INSTANCE
+            this.value != NULL_STRING -> {
+                when (this.type) {
+                    ExampleValueType.NUMBER -> JsonPrimitive(BigDecimal(this.value))
+                    ExampleValueType.BOOLEAN -> JsonPrimitive(this.value.toBoolean())
+                    ExampleValueType.NULL -> JsonNull.INSTANCE
+                    else -> JsonPrimitive(this.value) // STRING
+                }
+            }
+            this.objects?.isNotEmpty() == true -> {
+                // Check if objects is a list (raw or object list)
+                if (objects.isRawList() || objects.isObjectList()) {
+                    generateFromExamples(objects)
+                } else {
+                    objects.toJsonObject()
+                }
+            }
             else -> throw IllegalArgumentException("Example object must have either value or objects ($this)")
         }
 
     private fun List<ExampleProperty>.toJsonObject(): JsonObject {
         val jsonObject = JsonObject()
         this.forEach {
-            val result = it.toSimpleExampleValue()
             if (it.name == NULL_STRING) {
                 throw IllegalArgumentException("Example object must have a name ($it)")
             }
-            when {
-                result.simpleValue != null -> jsonObject.addProperty(it.name, result.simpleValue)
-                result.jsonElement != null -> jsonObject.add(it.name, result.jsonElement)
-            }
+            jsonObject.add(it.name, it.toJsonElement())
         }
         return jsonObject
     }
 
     private fun List<ExampleProperty>.isObjectList(): Boolean =
-        this.isNotEmpty() && this.all { it.name == NULL_STRING && it.value == NULL_STRING && it.objects?.isNotEmpty() ?: false }
+        this.isNotEmpty() && this.all { it.name == null && it.value == null && it.objects?.isNotEmpty() ?: false }
 
     private fun List<ExampleProperty>.isRawList(): Boolean =
-        this.isNotEmpty() && this.all { it.name == NULL_STRING && it.value != NULL_STRING && it.objects?.isEmpty() ?: true }
+        this.isNotEmpty() && this.all { it.name == null && it.value != null && it.objects?.isEmpty() ?: true }
 
 }

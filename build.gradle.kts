@@ -5,7 +5,7 @@ plugins {
     kotlin("jvm") version "1.9.22"
     `maven-publish`
     signing
-    id("io.github.gradle-nexus.publish-plugin") version "1.3.0"
+    id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
 }
 
 description = "Javalin OpenAPI Parent | Parent"
@@ -15,25 +15,19 @@ allprojects {
     apply(plugin = "signing")
     apply(plugin = "maven-publish")
 
-    group = "io.javalin.community.openapi"
-    version = "6.7.0-2"
+    group = "com.goodmem"
+    version = "6.7.0-4-custompatch"
 
     repositories {
         mavenCentral()
         maven("https://maven.reposilite.com/snapshots")
+        maven("https://jitpack.io")
     }
 
     publishing {
         repositories {
-            maven {
-                name = "reposilite-repository"
-                url = uri("https://maven.reposilite.com/${if (version.toString().endsWith("-SNAPSHOT")) "snapshots" else "releases"}")
-
-                credentials {
-                    username = getEnvOrProperty("MAVEN_NAME", "mavenUser")
-                    password = getEnvOrProperty("MAVEN_TOKEN", "mavenPassword")
-                }
-            }
+            // JitPack builds directly from GitHub releases/tags
+            // No explicit repository configuration needed
         }
     }
 
@@ -134,6 +128,8 @@ subprojects {
 nexusPublishing {
     repositories {
         sonatype {
+            nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://central.sonatype.com/repository/maven-snapshots/"))
             username.set(getEnvOrProperty("SONATYPE_USER", "sonatypeUser"))
             password.set(getEnvOrProperty("SONATYPE_PASSWORD", "sonatypePassword"))
         }
