@@ -208,15 +208,15 @@ annotation class OpenApiSecurity(
     val scopes: Array<String> = []
 )
 
-@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiIgnore
 
-@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiRequired
 
-@Target(CLASS, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Target(CLASS, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiName(
     val value: String
@@ -244,10 +244,10 @@ annotation class OpenApiExample(
 )
 
 enum class ExampleValueType {
-    STRING,    // "value" (default)
-    NUMBER,    // 123 or 45.67
-    BOOLEAN,   // true or false
-    NULL       // null
+    STRING,
+    NUMBER,
+    BOOLEAN,
+    NULL,
 }
 
 @Target(ANNOTATION_CLASS)
@@ -255,18 +255,19 @@ enum class ExampleValueType {
 annotation class OpenApiExampleProperty(
     val name: String = NULL_STRING,
     val value: String = NULL_STRING,
+    val type: ExampleValueType = ExampleValueType.STRING,
     /** For more complex examples, you can use the `raw` field to provide a JSON string that will be parsed as an example. */
     val raw: String = NULL_STRING,
     val objects: Array<OpenApiExampleProperty> = []
 )
 
-@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiNullable(
     val nullable: Boolean = true
 )
 
-@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, CLASS)
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, CLASS, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiDescription(
     val value: String
@@ -278,7 +279,7 @@ enum class Nullability {
     AUTO
 }
 
-@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiNumberValidation(
     val minimum: String = NULL_STRING,
@@ -288,7 +289,7 @@ annotation class OpenApiNumberValidation(
     val multipleOf: String = NULL_STRING
 )
 
-@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiStringValidation(
     val minLength: String = NULL_STRING,
@@ -297,7 +298,7 @@ annotation class OpenApiStringValidation(
     val pattern: String = NULL_STRING
 )
 
-@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiArrayValidation(
     val minItems: String = NULL_STRING,
@@ -305,14 +306,14 @@ annotation class OpenApiArrayValidation(
     val uniqueItems: Boolean = false
 )
 
-@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiObjectValidation(
     val minProperties: String = NULL_STRING,
     val maxProperties: String = NULL_STRING,
 )
 
-@Target(CLASS, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Target(CLASS, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
 @Retention(RUNTIME)
 annotation class OpenApiPropertyType(
     val definedBy: KClass<*>,

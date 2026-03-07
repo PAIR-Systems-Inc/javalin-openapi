@@ -386,6 +386,89 @@ internal class TypeMappersTest : OpenApiAnnotationProcessorSpecification() {
             .isEqualTo("string-example")
     }
 
+    private class TypedExampleEntity(
+        @get:OpenApiExample(
+            objects = [
+                OpenApiExampleProperty(name = "price", value = "99.99", type = ExampleValueType.NUMBER),
+                OpenApiExampleProperty(name = "inStock", value = "true", type = ExampleValueType.BOOLEAN),
+                OpenApiExampleProperty(name = "discount", type = ExampleValueType.NULL),
+                OpenApiExampleProperty(
+                    name = "ratings",
+                    objects = [
+                        OpenApiExampleProperty(value = "4.5", type = ExampleValueType.NUMBER),
+                        OpenApiExampleProperty(value = "4.8", type = ExampleValueType.NUMBER),
+                    ]
+                )
+            ]
+        )
+        val typedField: String
+    )
+
+    @OpenApi(
+        path = "typed-schema-examples",
+        versions = ["should_support_typed_schema_examples"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = TypedExampleEntity::class)])]
+    )
+    @Test
+    fun should_support_typed_schema_examples() = withOpenApi("should_support_typed_schema_examples") {
+        assertThatJson(it)
+            .inPath("$.components.schemas.TypedExampleEntity.properties.typedField.example")
+            .isEqualTo(json(
+                // language=json
+                """
+                {
+                  "price": 99.99,
+                  "inStock": true,
+                  "discount": null,
+                  "ratings": [4.5, 4.8]
+                }
+                """
+            ))
+    }
+
+    @OpenApi(
+        path = "typed-content-examples",
+        versions = ["should_support_typed_content_examples"],
+        responses = [
+            OpenApiResponse(
+                status = "200",
+                content = [
+                    OpenApiContent(
+                        from = String::class,
+                        exampleObjects = [
+                            OpenApiExampleProperty(name = "price", value = "99.99", type = ExampleValueType.NUMBER),
+                            OpenApiExampleProperty(name = "inStock", value = "true", type = ExampleValueType.BOOLEAN),
+                            OpenApiExampleProperty(name = "discount", type = ExampleValueType.NULL),
+                            OpenApiExampleProperty(
+                                name = "ratings",
+                                objects = [
+                                    OpenApiExampleProperty(value = "4.5", type = ExampleValueType.NUMBER),
+                                    OpenApiExampleProperty(value = "4.8", type = ExampleValueType.NUMBER),
+                                ]
+                            )
+                        ]
+                    ),
+                ],
+            ),
+        ]
+    )
+    @Test
+    fun should_support_typed_content_examples() = withOpenApi("should_support_typed_content_examples") {
+        assertThatJson(it)
+            .inPath("$.paths['/typed-content-examples'].get.responses.200.content['text/plain'].example")
+            .isEqualTo(json(
+                // language=json
+                """
+                {
+                  "price": 99.99,
+                  "inStock": true,
+                  "discount": null,
+                  "ratings": [4.5, 4.8]
+                }
+                """
+            ))
+    }
+
     @OpenApiPropertyType(definedBy = Int::class)
     @OpenApiDescription("Sort order:\n * 1 - Request type 1\n * 2 - Request type 2")
     private enum class IntegerEnum {
