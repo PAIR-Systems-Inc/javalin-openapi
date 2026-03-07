@@ -7,24 +7,44 @@ plugins {
 }
 
 dependencies {
-    api(project(":openapi-specification"))
+    api(project(":openapi-generator"))
     kaptTest(project(":openapi-annotation-processor"))
     testImplementation(project(":openapi-annotation-processor"))
 
     implementation(kotlin("reflect"))
-    implementation("org.apache.groovy:groovy:4.0.27")
+    implementation(libs.groovy)
 
-    implementation("io.javalin:javalin:6.7.0") {
+    implementation(libs.javalin) {
         exclude(group = "org.slf4j")
     }
 
-    implementation("io.swagger.parser.v3:swagger-parser:2.1.35")
+    implementation(libs.swagger.parser) {
+        exclude(group = "com.fasterxml.jackson")
+        exclude(group = "com.fasterxml.jackson.core")
+        exclude(group = "com.fasterxml.jackson.dataformat")
+        exclude(group = "com.fasterxml.jackson.datatype")
+    }
+    implementation(libs.jackson.dataformat.yaml)
+    implementation(libs.jackson.datatype.jsr310)
 
-    implementation("ch.qos.logback:logback-classic:1.5.25")
+    implementation(libs.logback.classic)
 
-    testImplementation("org.mongodb:bson:4.9.0")
+    testImplementation(libs.javalin)
+    testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.assertj.core)
+    testImplementation(libs.json.unit.assertj)
+    testImplementation(libs.unirest)
+    testImplementation(libs.logback.classic)
+    testImplementation(libs.mongodb.bson)
+}
 
-    implementation(platform("org.eclipse.jetty:jetty-http:12.0.12"))
+kapt {
+    arguments {
+        arg("openapi.groovy.path", "$projectDir/src/test/compile/openapi.groovy")
+    }
 }
 
 tasks.withType<KaptGenerateStubs> {

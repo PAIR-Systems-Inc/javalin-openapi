@@ -1,4 +1,5 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
     kotlin("kapt")
@@ -9,11 +10,11 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-tasks.withType<KotlinCompile>().configureEach {
-    kotlinOptions {
-        jvmTarget = "17"
-        languageVersion = "1.8"
-        freeCompilerArgs = listOf("-Xjvm-default=all") // For generating default methods in interfaces
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        languageVersion.set(KotlinVersion.KOTLIN_2_2)
+        freeCompilerArgs.addAll("-Xjvm-default=all")
     }
 }
 
@@ -23,29 +24,36 @@ sourceSets.getByName("main") {
 
 dependencies {
     // declare lombok annotation processor as first
-    val lombok = "1.18.28"
-    compileOnly("org.projectlombok:lombok:$lombok")
-    annotationProcessor("org.projectlombok:lombok:$lombok")
-    testCompileOnly("org.projectlombok:lombok:$lombok")
-    testAnnotationProcessor("org.projectlombok:lombok:$lombok")
-    implementation("jakarta.validation:jakarta.validation-api:2.0.2")
+    compileOnly(libs.lombok)
+    annotationProcessor(libs.lombok)
+    testCompileOnly(libs.lombok)
+    testAnnotationProcessor(libs.lombok)
+    implementation(libs.jakarta.validation.api)
 
     // then openapi annotation processor
     kapt(project(":openapi-annotation-processor"))
     implementation(project(":javalin-plugins:javalin-openapi-plugin"))
     implementation(project(":javalin-plugins:javalin-swagger-plugin"))
     implementation(project(":javalin-plugins:javalin-redoc-plugin"))
-    testImplementation("org.apache.groovy:groovy:4.0.12")
 
     // javalin
-    implementation("io.javalin:javalin:6.7.0")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.1")
+    implementation(libs.javalin)
+    implementation(libs.jackson.databind)
 
     // logging
-    implementation("ch.qos.logback:logback-classic:1.5.25")
+    implementation(libs.logback.classic)
 
     // some test integrations
-    implementation("org.mongodb:bson:4.9.1")
+    implementation(libs.mongodb.bson)
+    testImplementation(libs.groovy)
+    testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.assertj.core)
+    testImplementation(libs.json.unit.assertj)
+    testImplementation(libs.unirest)
+    testImplementation(libs.logback.classic)
 }
 
 kapt {

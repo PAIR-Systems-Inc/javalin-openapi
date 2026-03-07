@@ -6,9 +6,7 @@ import java.lang.reflect.Proxy
 import javax.annotation.processing.ProcessingEnvironment
 import javax.tools.Diagnostic.Kind.NOTE
 
-
 object AnnotationProcessorTools {
-
     /**
      * GH-141 Support IntelliJ's ProcessingEnvironment
      * ~ https://github.com/javalin/javalin-openapi/issues/141
@@ -26,7 +24,7 @@ object AnnotationProcessorTools {
                 val invocationHandler = Proxy.getInvocationHandler(processingEnv)
 
                 try {
-                    val field = invocationHandler.javaClass.getDeclaredField("val\$delegateTo")
+                    val field = invocationHandler.javaClass.getDeclaredField($$"val$delegateTo")
                     field.isAccessible = true
 
                     when (val delegateTo = field.get(invocationHandler)) {
@@ -43,5 +41,4 @@ object AnnotationProcessorTools {
             }
             else -> processingEnv
         }
-
 }

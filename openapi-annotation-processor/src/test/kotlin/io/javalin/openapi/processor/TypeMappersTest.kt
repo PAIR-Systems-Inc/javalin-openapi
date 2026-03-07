@@ -11,9 +11,15 @@ import org.junit.jupiter.api.Test
 import java.io.File
 import java.io.InputStream
 import java.math.BigDecimal
+import java.math.BigInteger
+import java.net.URI
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.OffsetDateTime
+import java.time.ZonedDateTime
 import java.util.Date
 import java.util.UUID
 
@@ -41,7 +47,7 @@ internal class TypeMappersTest : OpenApiAnnotationProcessorSpecification() {
         val short: Short,
         val shortObject: java.lang.Short,
         val int: Int,
-        val intObject: java.lang.Integer,
+        val intObject: Integer,
         val long: Long,
         val longObject: java.lang.Long,
         val float: Float,
@@ -52,6 +58,7 @@ internal class TypeMappersTest : OpenApiAnnotationProcessorSpecification() {
         val charObject: java.lang.Character,
         val string: String,
         val bigDecimal: BigDecimal,
+        val bigInteger: BigInteger,
         val uuid: UUID,
         val objectId: ObjectId,
         val byteArray: ByteArray,
@@ -60,7 +67,12 @@ internal class TypeMappersTest : OpenApiAnnotationProcessorSpecification() {
         val date: Date,
         val localDate: LocalDate,
         val localDateTime: LocalDateTime,
+        val zonedDateTime: ZonedDateTime,
+        val offsetDateTime: OffsetDateTime,
         val instant: Instant,
+        val localTime: LocalTime,
+        val duration: Duration,
+        val uri: URI,
         val obj: Object,
         val map: Map<*, *>,
         val mapWithList: Map<*, List<*>>,
@@ -160,8 +172,12 @@ internal class TypeMappersTest : OpenApiAnnotationProcessorSpecification() {
                   "bigDecimal": {
                     "type": "string"
                   },
+                  "bigInteger": {
+                    "type": "integer"
+                  },
                   "uuid": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "uuid"
                   },
                   "objectId": {
                     "type": "string"
@@ -190,9 +206,29 @@ internal class TypeMappersTest : OpenApiAnnotationProcessorSpecification() {
                     "type": "string",
                     "format": "date-time"
                   },
+                  "zonedDateTime": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "offsetDateTime": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
                   "instant": {
                     "type": "string",
                     "format": "date-time"
+                  },
+                  "localTime": {
+                    "type": "string",
+                    "format": "time"
+                  },
+                  "duration": {
+                    "type": "string",
+                    "format": "duration"
+                  },
+                  "uri": {
+                    "type": "string",
+                    "format": "uri"
                   },
                   "obj": {
                     "type": "object"
@@ -260,6 +296,239 @@ internal class TypeMappersTest : OpenApiAnnotationProcessorSpecification() {
             ))
     }
 
+    @OpenApi(
+        path = "nested-list-example",
+        versions = ["should_support_nested_lists_in_example_objects"],
+        responses = [
+            OpenApiResponse(
+                status = "200",
+                content = [
+                    OpenApiContent(
+                        from = String::class,
+                        exampleObjects = [
+                            OpenApiExampleProperty(name = "name", value = "document"),
+                            OpenApiExampleProperty(
+                                name = "metadata",
+                                objects = [
+                                    OpenApiExampleProperty(name = "source", value = "document"),
+                                    OpenApiExampleProperty(name = "author", value = "John Doe"),
+                                    OpenApiExampleProperty(
+                                        name = "tags",
+                                        objects = [
+                                            OpenApiExampleProperty(value = "important"),
+                                            OpenApiExampleProperty(value = "research")
+                                        ]
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+                ],
+            ),
+        ]
+    )
+    @Test
+    fun should_support_nested_lists_in_example_objects() = withOpenApi("should_support_nested_lists_in_example_objects") {
+        println(it)
+
+        assertThatJson(it)
+            .inPath("$.paths['/nested-list-example'].get.responses.200.content['text/plain'].example")
+            .isObject
+            .isEqualTo(json(
+                // language=json
+                """
+                {
+                  "name": "document",
+                  "metadata": {
+                    "source": "document",
+                    "author": "John Doe",
+                    "tags": ["important", "research"]
+                  }
+                }
+                """
+            ))
+    }
+
+    private class RawExampleEntity(
+        @get:OpenApiExample(raw = "1234")
+        val intField: Int,
+        @get:OpenApiExample(raw = "true")
+        val boolField: Boolean,
+        @get:OpenApiExample(raw = """[1, 2, 3]""")
+        val arrayField: List<Int>,
+        @get:OpenApiExample(value = "string-example")
+        val stringField: String
+    )
+
+    @OpenApi(
+        path = "raw-examples",
+        versions = ["should_support_raw_examples"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = RawExampleEntity::class)])]
+    )
+    @Test
+    fun should_support_raw_examples() = withOpenApi("should_support_raw_examples") {
+        println(it)
+
+        assertThatJson(it)
+            .inPath("$.components.schemas.RawExampleEntity.properties.intField.example")
+            .isEqualTo(1234)
+
+        assertThatJson(it)
+            .inPath("$.components.schemas.RawExampleEntity.properties.boolField.example")
+            .isEqualTo(true)
+
+        assertThatJson(it)
+            .inPath("$.components.schemas.RawExampleEntity.properties.arrayField.example")
+            .isEqualTo(json("[1, 2, 3]"))
+
+        assertThatJson(it)
+            .inPath("$.components.schemas.RawExampleEntity.properties.stringField.example")
+            .isEqualTo("string-example")
+    }
+
+    private class TypedExampleEntity(
+        @get:OpenApiExample(
+            objects = [
+                OpenApiExampleProperty(name = "price", value = "99.99", type = ExampleValueType.NUMBER),
+                OpenApiExampleProperty(name = "inStock", value = "true", type = ExampleValueType.BOOLEAN),
+                OpenApiExampleProperty(name = "discount", type = ExampleValueType.NULL),
+                OpenApiExampleProperty(
+                    name = "ratings",
+                    objects = [
+                        OpenApiExampleProperty(value = "4.5", type = ExampleValueType.NUMBER),
+                        OpenApiExampleProperty(value = "4.8", type = ExampleValueType.NUMBER),
+                    ]
+                )
+            ]
+        )
+        val typedField: String
+    )
+
+    @OpenApi(
+        path = "typed-schema-examples",
+        versions = ["should_support_typed_schema_examples"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = TypedExampleEntity::class)])]
+    )
+    @Test
+    fun should_support_typed_schema_examples() = withOpenApi("should_support_typed_schema_examples") {
+        assertThatJson(it)
+            .inPath("$.components.schemas.TypedExampleEntity.properties.typedField.example")
+            .isEqualTo(json(
+                // language=json
+                """
+                {
+                  "price": 99.99,
+                  "inStock": true,
+                  "discount": null,
+                  "ratings": [4.5, 4.8]
+                }
+                """
+            ))
+    }
+
+    @OpenApi(
+        path = "typed-content-examples",
+        versions = ["should_support_typed_content_examples"],
+        responses = [
+            OpenApiResponse(
+                status = "200",
+                content = [
+                    OpenApiContent(
+                        from = String::class,
+                        exampleObjects = [
+                            OpenApiExampleProperty(name = "price", value = "99.99", type = ExampleValueType.NUMBER),
+                            OpenApiExampleProperty(name = "inStock", value = "true", type = ExampleValueType.BOOLEAN),
+                            OpenApiExampleProperty(name = "discount", type = ExampleValueType.NULL),
+                            OpenApiExampleProperty(
+                                name = "ratings",
+                                objects = [
+                                    OpenApiExampleProperty(value = "4.5", type = ExampleValueType.NUMBER),
+                                    OpenApiExampleProperty(value = "4.8", type = ExampleValueType.NUMBER),
+                                ]
+                            )
+                        ]
+                    ),
+                ],
+            ),
+        ]
+    )
+    @Test
+    fun should_support_typed_content_examples() = withOpenApi("should_support_typed_content_examples") {
+        assertThatJson(it)
+            .inPath("$.paths['/typed-content-examples'].get.responses.200.content['text/plain'].example")
+            .isEqualTo(json(
+                // language=json
+                """
+                {
+                  "price": 99.99,
+                  "inStock": true,
+                  "discount": null,
+                  "ratings": [4.5, 4.8]
+                }
+                """
+            ))
+    }
+
+    @OpenApiPropertyType(definedBy = Int::class)
+    @OpenApiDescription("Sort order:\n * 1 - Request type 1\n * 2 - Request type 2")
+    private enum class IntegerEnum {
+        @OpenApiName("1") REQUEST_TYPE_1,
+        @OpenApiName("2") REQUEST_TYPE_2
+    }
+
+    @OpenApi(
+        path = "integer-enum",
+        versions = ["should_support_integer_enum"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = IntegerEnum::class)])]
+    )
+    @Test
+    fun should_support_integer_enum() = withOpenApi("should_support_integer_enum") {
+        println(it)
+
+        assertThatJson(it)
+            .inPath("$.components.schemas.IntegerEnum")
+            .isObject
+            .isEqualTo(json(
+                // language=json
+                """
+                {
+                  "type": "integer",
+                  "format": "int32",
+                  "enum": [1, 2],
+                  "description": "Sort order:\n * 1 - Request type 1\n * 2 - Request type 2"
+                }
+                """
+            ))
+    }
+
+    @OpenApiDescription("A regular string enum with description")
+    private enum class DescribedStringEnum {
+        ALPHA,
+        BETA
+    }
+
+    @OpenApi(
+        path = "described-enum",
+        versions = ["should_support_description_on_string_enum"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = DescribedStringEnum::class)])]
+    )
+    @Test
+    fun should_support_description_on_string_enum() = withOpenApi("should_support_description_on_string_enum") {
+        assertThatJson(it)
+            .inPath("$.components.schemas.DescribedStringEnum")
+            .isObject
+            .isEqualTo(json(
+                // language=json
+                """
+                {
+                  "type": "string",
+                  "enum": ["ALPHA", "BETA"],
+                  "description": "A regular string enum with description"
+                }
+                """
+            ))
+    }
+
     private class Loop(
         val self: Loop?,
     )
@@ -272,8 +541,18 @@ internal class TypeMappersTest : OpenApiAnnotationProcessorSpecification() {
     @Test
     fun should_map_recursive_type() = withOpenApi("should_map_recursive_type") {
         assertThatJson(it)
-            .inPath("$.components.schemas.Loop.properties.self")
+            .inPath("$.components.schemas.Loop.properties.self.anyOf")
+            .isArray
+            .hasSize(2)
+
+        assertThatJson(it)
+            .inPath("$.components.schemas.Loop.properties.self.anyOf[0]")
             .isObject
-            .containsEntry("\$ref", "#/components/schemas/Loop")
+            .containsEntry($$"$ref", "#/components/schemas/Loop")
+
+        assertThatJson(it)
+            .inPath("$.components.schemas.Loop.properties.self.anyOf[1]")
+            .isObject
+            .containsEntry("type", "null")
     }
 }
