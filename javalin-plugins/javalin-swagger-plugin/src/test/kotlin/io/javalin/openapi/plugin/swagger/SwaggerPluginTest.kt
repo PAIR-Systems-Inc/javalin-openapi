@@ -10,7 +10,10 @@ internal class SwaggerPluginTest {
 
     @Test
     fun `should properly host swagger ui`() {
-        val app = Javalin.createAndStart { it.registerPlugin(SwaggerPlugin()) }
+        val app = Javalin.start {
+            it.jetty.port = 0
+            it.registerPlugin(SwaggerPlugin())
+        }
 
         try {
             val response = Unirest.get("http://localhost:8080/swagger")
@@ -45,13 +48,17 @@ internal class SwaggerPluginTest {
     }
 
     @Test
-    fun `should have custom css and js injected`() {
-        val app = Javalin.createAndStart { it.registerPlugin(SwaggerPlugin { swagger ->
-            swagger
-                .injectStylesheet("/swagger.css")
-                .injectStylesheet("/swagger-the-print.css", "print")
-                .injectJavaScript("/script.js")
-        }) }
+    fun `should have custom version, css and js injected`() {
+        val app = Javalin.start {
+            it.jetty.port = 0
+            it.registerPlugin(SwaggerPlugin { swagger ->
+                swagger
+                    .injectStylesheet("/swagger.css")
+                    .injectStylesheet("/swagger-the-print.css", "print")
+                    .injectJavaScript("/script.js")
+                    .injectCustomVersion("custom", "/openapi.yaml")
+            })
+        }
 
         try {
             val response = Unirest.get("http://localhost:8080/swagger")
@@ -68,7 +75,8 @@ internal class SwaggerPluginTest {
 
     @Test
     fun `should not fail if second swagger plugin is registered`() {
-        val app = Javalin.createAndStart {
+        val app = Javalin.start {
+            it.jetty.port = 0
             it.registerPlugin(SwaggerPlugin())
             it.registerPlugin(SwaggerPlugin { swagger ->
                 swagger.documentationPath = "/example-docs"
@@ -107,15 +115,14 @@ internal class SwaggerPluginTest {
 
     @Test
     fun `should not fail if second swagger plugin is registered with routes`(){
-        val app = Javalin.createAndStart {
+        val app = Javalin.start {
+            it.jetty.port = 0
             it.registerPlugin(SwaggerPlugin())
             it.registerPlugin(SwaggerPlugin { swagger ->
                 swagger.documentationPath = "/example-docs"
                 swagger.uiPath = "/example-ui"
             })
-            it.router.mount { cfg ->
-                cfg.get("/some/route/") { ctx -> ctx.result("Hello World") }
-            }
+            it.routes.get("/some/route/") { ctx -> ctx.result("Hello World") }
         }
 
         try {

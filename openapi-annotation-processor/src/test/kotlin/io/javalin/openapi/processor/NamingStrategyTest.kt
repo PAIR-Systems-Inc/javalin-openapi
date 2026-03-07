@@ -1,0 +1,176 @@
+@file:Suppress("unused")
+
+package io.javalin.openapi.processor
+
+import io.javalin.openapi.OpenApi
+import io.javalin.openapi.OpenApiContent
+import io.javalin.openapi.OpenApiName
+import io.javalin.openapi.OpenApiNaming
+import io.javalin.openapi.OpenApiNamingStrategy
+import io.javalin.openapi.OpenApiResponse
+import io.javalin.openapi.experimental.processor.generators.splitCamelCase
+import io.javalin.openapi.experimental.processor.generators.translatePropertyName
+import io.javalin.openapi.processor.specification.OpenApiAnnotationProcessorSpecification
+import net.javacrumbs.jsonunit.assertj.JsonAssertions.json
+import net.javacrumbs.jsonunit.assertj.assertThatJson
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+
+internal class NamingStrategyTest : OpenApiAnnotationProcessorSpecification() {
+
+    @Test
+    fun should_split_camel_case_into_words() {
+        assertThat(splitCamelCase("firstName")).containsExactly("first", "Name")
+        assertThat(splitCamelCase("homeAddress")).containsExactly("home", "Address")
+        assertThat(splitCamelCase("simple")).containsExactly("simple")
+        assertThat(splitCamelCase("myURLParser")).containsExactly("my", "URL", "Parser")
+        assertThat(splitCamelCase("userID")).containsExactly("user", "ID")
+        assertThat(splitCamelCase("HTMLElement")).containsExactly("HTML", "Element")
+        assertThat(splitCamelCase("")).isEmpty()
+    }
+
+    @Test
+    fun should_translate_property_names() {
+        assertThat(translatePropertyName(OpenApiNamingStrategy.DEFAULT, "firstName")).isEqualTo("firstName")
+        assertThat(translatePropertyName(OpenApiNamingStrategy.SNAKE_CASE, "firstName")).isEqualTo("first_name")
+        assertThat(translatePropertyName(OpenApiNamingStrategy.SNAKE_CASE, "homeAddress")).isEqualTo("home_address")
+        assertThat(translatePropertyName(OpenApiNamingStrategy.KEBAB_CASE, "firstName")).isEqualTo("first-name")
+        assertThat(translatePropertyName(OpenApiNamingStrategy.KEBAB_CASE, "homeAddress")).isEqualTo("home-address")
+        assertThat(translatePropertyName(OpenApiNamingStrategy.SNAKE_CASE, "simple")).isEqualTo("simple")
+    }
+
+    @OpenApiNaming(OpenApiNamingStrategy.SNAKE_CASE)
+    private class SnakeCaseEntity(
+        val firstName: String,
+        val lastName: String,
+        val homeAddress: String
+    )
+
+    @OpenApi(
+        path = "/snake-case",
+        versions = ["should_apply_snake_case_naming"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = SnakeCaseEntity::class)])]
+    )
+    @Test
+    fun should_apply_snake_case_naming() = withOpenApi("should_apply_snake_case_naming") {
+        assertThatJson(it)
+            .inPath("$.components.schemas.SnakeCaseEntity.properties")
+            .isObject
+            .containsKey("first_name")
+            .containsKey("last_name")
+            .containsKey("home_address")
+            .doesNotContainKey("firstName")
+            .doesNotContainKey("lastName")
+            .doesNotContainKey("homeAddress")
+    }
+
+    @OpenApiNaming(OpenApiNamingStrategy.KEBAB_CASE)
+    private class KebabCaseEntity(
+        val firstName: String,
+        val lastName: String
+    )
+
+    @OpenApi(
+        path = "/kebab-case",
+        versions = ["should_apply_kebab_case_naming"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = KebabCaseEntity::class)])]
+    )
+    @Test
+    fun should_apply_kebab_case_naming() = withOpenApi("should_apply_kebab_case_naming") {
+        assertThatJson(it)
+            .inPath("$.components.schemas.KebabCaseEntity.properties")
+            .isObject
+            .containsKey("first-name")
+            .containsKey("last-name")
+            .doesNotContainKey("firstName")
+            .doesNotContainKey("lastName")
+    }
+
+    // Enum naming tests
+
+    @OpenApiNaming(OpenApiNamingStrategy.SNAKE_CASE)
+    private enum class SnakeCaseEnum {
+        MyValue,
+        AnotherValue
+    }
+
+    @OpenApi(
+        path = "/enum-snake-case",
+        versions = ["should_apply_snake_case_naming_to_enum"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = SnakeCaseEnum::class)])]
+    )
+    @Test
+    fun should_apply_snake_case_naming_to_enum() = withOpenApi("should_apply_snake_case_naming_to_enum") {
+        assertThatJson(it)
+            .inPath("$.components.schemas.SnakeCaseEnum.enum")
+            .isArray
+            .isEqualTo(json("""["my_value", "another_value"]"""))
+    }
+
+    private enum class EnumWithCustomNames {
+        @OpenApiName("custom-one")
+        ONE,
+        TWO,
+        @OpenApiName("custom-three")
+        THREE
+    }
+
+    @OpenApi(
+        path = "/enum-custom-names",
+        versions = ["should_apply_openapi_name_to_enum_values"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = EnumWithCustomNames::class)])]
+    )
+    @Test
+    fun should_apply_openapi_name_to_enum_values() = withOpenApi("should_apply_openapi_name_to_enum_values") {
+        assertThatJson(it)
+            .inPath("$.components.schemas.EnumWithCustomNames.enum")
+            .isArray
+            .isEqualTo(json("""["custom-one", "TWO", "custom-three"]"""))
+    }
+
+    @OpenApiNaming(OpenApiNamingStrategy.KEBAB_CASE)
+    private enum class EnumNamingWithOverride {
+        MyValue,
+        @OpenApiName("customName")
+        AnotherValue
+    }
+
+    @OpenApi(
+        path = "/enum-naming-override",
+        versions = ["should_prefer_openapi_name_over_naming_strategy_for_enum"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = EnumNamingWithOverride::class)])]
+    )
+    @Test
+    fun should_prefer_openapi_name_over_naming_strategy_for_enum() = withOpenApi("should_prefer_openapi_name_over_naming_strategy_for_enum") {
+        assertThatJson(it)
+            .inPath("$.components.schemas.EnumNamingWithOverride.enum")
+            .isArray
+            .isEqualTo(json("""["my-value", "customName"]"""))
+    }
+
+    // Property naming override tests
+
+    @OpenApiNaming(OpenApiNamingStrategy.SNAKE_CASE)
+    private class NamingWithOverrideEntity(
+        val firstName: String,
+        @get:OpenApiName("customLastName")
+        val lastName: String
+    )
+
+    @OpenApi(
+        path = "/naming-override",
+        versions = ["should_prefer_openapi_name_over_naming_strategy"],
+        responses = [OpenApiResponse(status = "200", content = [OpenApiContent(from = NamingWithOverrideEntity::class)])]
+    )
+    @Test
+    fun should_prefer_openapi_name_over_naming_strategy() = withOpenApi("should_prefer_openapi_name_over_naming_strategy") {
+        assertThatJson(it)
+            .inPath("$.components.schemas.NamingWithOverrideEntity.properties")
+            .isObject
+            .containsKey("first_name")
+            .containsKey("customLastName")
+            .doesNotContainKey("firstName")
+            .doesNotContainKey("last_name")
+    }
+
+}

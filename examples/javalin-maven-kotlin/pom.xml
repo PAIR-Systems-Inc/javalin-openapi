@@ -9,8 +9,8 @@
     <version>1.0.0</version>
 
     <properties>
-        <javalin.version>6.7.0</javalin.version>
-        <javalin.openapi.version>6.7.0-2</javalin.openapi.version>
+        <javalin.version>7.0.1</javalin.version>
+        <javalin.openapi.version>7.0.1</javalin.openapi.version>
         <kotlin.version>2.1.0</kotlin.version>
     </properties>
 
@@ -84,7 +84,14 @@
                     <artifactId>kotlin-maven-plugin</artifactId>
                     <groupId>org.jetbrains.kotlin</groupId>
                     <version>2.1.0</version>
-
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <version>3.5.0</version>
+                    <configuration>
+                        <mainClass>io.javalin.openapi.plugin.test.KotlinTestKt</mainClass>
+                    </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>

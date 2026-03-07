@@ -14,7 +14,7 @@ import org.bson.types.ObjectId;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotEmpty;
 import java.io.File;
 import java.io.Serializable;
 import java.lang.annotation.ElementType;
@@ -45,7 +45,7 @@ public final class JavalinTest implements Handler {
      * @param args args
      */
     public static void main(String[] args) {
-        Javalin.createAndStart(config -> {
+        var app = Javalin.create(config -> {
             // config.routing.contextPath = "/custom";
             String deprecatedDocsPath = "/api/openapi.json"; // by default it's /openapi
 
@@ -54,16 +54,16 @@ public final class JavalinTest implements Handler {
                     .withDocumentationPath(deprecatedDocsPath)
                     .withRoles(Rules.ANONYMOUS)
                     .withPrettyOutput()
-                    .withDefinitionConfiguration((version, openApiDefinition) ->
-                        openApiDefinition
-                            .withInfo(openApiInfo ->
+                    .withDefinitionConfiguration((version, builder) ->
+                        builder
+                            .info(openApiInfo ->
                                 openApiInfo
                                     .description("App description goes right here")
                                     .termsOfService("https://example.com/tos")
                                     .contact("API Support", "https://www.example.com/support", "support@example.com")
                                     .license("Apache 2.0", "https://www.apache.org/licenses/", "Apache-2.0")
                             )
-                            .withServer(openApiServer ->
+                            .server(openApiServer ->
                                 openApiServer
                                     .description("Server description goes here")
                                     .url("http://localhost:{port}{basePath}/" + version + "/")
@@ -71,48 +71,46 @@ public final class JavalinTest implements Handler {
                                     .variable("basePath", "Base path of the server", "", "", "/v1")
                             )
                             // Based on official example: https://swagger.io/docs/specification/authentication/oauth2/
-                            .withSecurity(openApiSecurity ->
-                                openApiSecurity
-                                    .withBasicAuth()
-                                    .withBearerAuth()
-                                    .withApiKeyAuth("ApiKeyAuth", "X-Api-Key")
-                                    .withCookieAuth("CookieAuth", "JSESSIONID")
-                                    .withOpenID("OpenID", "https://example.com/.well-known/openid-configuration")
-                                    .withOAuth2("OAuth2", "This API uses OAuth 2 with the implicit grant flow.", oauth2 ->
-                                        oauth2
-                                            .withClientCredentials("https://api.example.com/credentials/authorize")
-                                            .withImplicitFlow("https://api.example.com/oauth2/authorize", flow ->
-                                                flow
-                                                    .withScope("read_pets", "read your pets")
-                                                    .withScope("write_pets", "modify pets in your account")
-                                            )
+                            .withBasicAuth()
+                            .withBearerAuth()
+                            .withApiKeyAuth("ApiKeyAuth", "X-Api-Key")
+                            .withCookieAuth("CookieAuth", "JSESSIONID")
+                            .withOpenID("OpenID", "https://example.com/.well-known/openid-configuration")
+                            .withOAuth2("OAuth2", "This API uses OAuth 2 with the implicit grant flow.", oauth2 ->
+                                oauth2
+                                    .withClientCredentials("https://api.example.com/credentials/authorize")
+                                    .withImplicitFlow("https://api.example.com/oauth2/authorize", flow ->
+                                        flow
+                                            .withScope("read_pets", "read your pets")
+                                            .withScope("write_pets", "modify pets in your account")
                                     )
-                                    .withGlobalSecurity("OAuth2", globalSecurity ->
-                                        globalSecurity
-                                            .withScope("write_pets")
-                                            .withScope("read_pets")
-                                    )
-                                    .withGlobalSecurity("BearerAuth")
                             )
-                            .withDefinitionProcessor(content -> { // you can add whatever you want to this document using your favourite json api
-                                content.set("test", new TextNode("Value"));
-                                return content.toPrettyString();
-                            })
-                    )));
+                            .withGlobalSecurity("OAuth2", globalSecurity ->
+                                globalSecurity
+                                    .withScope("write_pets")
+                                    .withScope("read_pets")
+                            )
+                            .withGlobalSecurity("BearerAuth")
+                    )
+                    .withDefinitionProcessor(content -> { // you can add whatever you want to this document using your favourite json api
+                        content.set("test", new TextNode("Value"));
+                        return content.toPrettyString();
+                    })));
 
-            config.registerPlugin(new SwaggerPlugin(swaggerConfiguration -> {
-                swaggerConfiguration.setDocumentationPath(deprecatedDocsPath);
-            }));
+            config.registerPlugin(new SwaggerPlugin(swaggerConfiguration ->
+                swaggerConfiguration.withDocumentationPath(deprecatedDocsPath)
+            ));
 
-            config.registerPlugin(new ReDocPlugin(reDocConfiguration -> {
-                reDocConfiguration.setDocumentationPath(deprecatedDocsPath);
-            }));
+            config.registerPlugin(new ReDocPlugin(reDocConfiguration ->
+                reDocConfiguration.withDocumentationPath(deprecatedDocsPath)
+            ));
 
             for (JsonSchemaResource generatedJsonSchema : new JsonSchemaLoader().loadGeneratedSchemes()) {
                 System.out.println(generatedJsonSchema.getName());
                 System.out.println(generatedJsonSchema.getContentAsString());
             }
         });
+        app.start();
     }
 
     @OpenApi(
@@ -165,7 +163,9 @@ public final class JavalinTest implements Handler {
                 @OpenApiContent(from = DtoWithFields.class, mimeType = "app/dto-fields"), // map only fields
                 @OpenApiContent(from = DtoWithFieldsAndMethods.class, mimeType = "app/dto-fields-and-methods"), // map fields and methods
                 @OpenApiContent(from = EnumEntity.class, mimeType = "app/enum"), // enum,
-                @OpenApiContent(from = CustomNameEntity.class, mimeType = "app/custom-name-entity") // custom name
+                @OpenApiContent(from = CustomNameEntity.class, mimeType = "app/custom-name-entity"), // custom name
+                @OpenApiContent(from = SnakeCaseEntity.class, mimeType = "app/snake-case"), // naming strategy
+                @OpenApiContent(from = IntegerEnumEntity.class, mimeType = "app/integer-enum") // integer enum
             }
         ),
         responses = {
@@ -402,9 +402,9 @@ public final class JavalinTest implements Handler {
         @OpenApiExample("5050")
         @OpenApiNumberValidation(
                 minimum = "5000",
-                exclusiveMinimum = true,
+                exclusiveMinimum = "5000",
                 maximum = "6000",
-                exclusiveMaximum = true,
+                exclusiveMaximum = "6000",
                 multipleOf = "50"
         )
         @OpenApiStringValidation(
@@ -531,10 +531,13 @@ public final class JavalinTest implements Handler {
         }
     }
 
+    @OpenApiNaming(OpenApiNamingStrategy.DEFAULT)
     enum EnumEntity {
 
         ONE("A"),
-        TWO("B");
+        TWO("B"),
+        @OpenApiName("custom-three")
+        THREE("C");
 
         private final String name;
 
@@ -547,6 +550,14 @@ public final class JavalinTest implements Handler {
             return name;
         }
 
+    }
+
+    @OpenApiPropertyType(definedBy = Integer.class)
+    @OpenApiDescription("Request type:\n * 1 - Type A\n * 2 - Type B\n * 3 - Type C")
+    enum IntegerEnumEntity {
+        @OpenApiName("1") TYPE_A,
+        @OpenApiName("2") TYPE_B,
+        @OpenApiName("3") TYPE_C
     }
 
     @JsonSchema(requireNonNulls = false)
@@ -609,5 +620,23 @@ public final class JavalinTest implements Handler {
 
     @OpenApiName("EntityWithCustomName")
     class CustomNameEntity {}
+
+    @OpenApiNaming(OpenApiNamingStrategy.SNAKE_CASE)
+    static class SnakeCaseEntity {
+
+        public String getFirstName() {
+            return "John";
+        }
+
+        public String getLastName() {
+            return "Doe";
+        }
+
+        @OpenApiName("customField")
+        public String getHomeAddress() {
+            return "123 Main St";
+        }
+
+    }
 
 }
