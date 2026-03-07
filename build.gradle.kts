@@ -6,8 +6,15 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     `maven-publish`
     signing
-    alias(libs.plugins.nexus.publish)
 }
+
+val githubOwner = "PAIR-Systems-Inc"
+val githubRepo = "javalin-openapi"
+val releaseVersion =
+    providers.gradleProperty("releaseVersion")
+        .orElse(providers.environmentVariable("RELEASE_VERSION"))
+        .orElse("8.0.0")
+        .get()
 
 description = "Javalin OpenAPI Parent | Parent"
 
@@ -16,23 +23,27 @@ allprojects {
     apply(plugin = "signing")
     apply(plugin = "maven-publish")
 
-    group = "io.javalin.community.openapi"
-    version = "7.0.2"
+    group = "ai.pairsys"
+    version = releaseVersion
 
     repositories {
         mavenCentral()
-        maven("https://maven.reposilite.com/snapshots")
     }
 
     publishing {
         repositories {
             maven {
-                name = "reposilite-repository"
-                url = uri("https://maven.reposilite.com/${if (version.toString().endsWith("-SNAPSHOT")) "snapshots" else "releases"}")
-
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/$githubOwner/$githubRepo")
                 credentials {
-                    username = getEnvOrProperty("MAVEN_NAME", "mavenUser")
-                    password = getEnvOrProperty("MAVEN_TOKEN", "mavenPassword")
+                    username =
+                        providers.gradleProperty("gpr.user")
+                            .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+                            .orNull
+                    password =
+                        providers.gradleProperty("gpr.key")
+                            .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+                            .orNull
                 }
             }
         }
@@ -46,10 +57,14 @@ allprojects {
                 publishing {
                     publications {
                         create<MavenPublication>("library") {
+                            groupId = project.group.toString()
+                            artifactId = project.name
+                            version = project.version.toString()
+
                             pom {
                                 name.set(projectName)
                                 description.set(projectDescription)
-                                url.set("https://github.com/javalin/javalin-openapi")
+                                url.set("https://github.com/$githubOwner/$githubRepo")
 
                                 licenses {
                                     license {
@@ -59,15 +74,14 @@ allprojects {
                                 }
                                 developers {
                                     developer {
-                                        id.set("dzikoysk")
-                                        name.set("dzikoysk")
-                                        email.set("dzikoysk@dzikoysk.net")
+                                        id.set("PAIR-Systems-Inc")
+                                        name.set("PAIR-Systems-Inc")
                                     }
                                 }
                                 scm {
-                                    connection.set("scm:git:git://github.com/javalin/javalin-openapi.git")
-                                    developerConnection.set("scm:git:ssh://github.com/javalin/javalin-openapi.git")
-                                    url.set("https://github.com/javalin/javalin-openapi.git")
+                                    connection.set("scm:git:https://github.com/$githubOwner/$githubRepo.git")
+                                    developerConnection.set("scm:git:ssh://git@github.com:$githubOwner/$githubRepo.git")
+                                    url.set("https://github.com/$githubOwner/$githubRepo")
                                 }
                             }
 
@@ -140,17 +154,3 @@ tasks.register("test-maven-examples") {
     group = "verification"
     dependsOn(mavenExamples.map { "test-maven-example-$it" })
 }
-
-nexusPublishing {
-    repositories {
-        sonatype {
-            nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://central.sonatype.com/repository/maven-snapshots/"))
-            username.set(getEnvOrProperty("SONATYPE_USER", "sonatypeUser"))
-            password.set(getEnvOrProperty("SONATYPE_PASSWORD", "sonatypePassword"))
-        }
-    }
-}
-
-fun getEnvOrProperty(env: String, property: String): String? =
-    System.getenv(env) ?: findProperty(property)?.toString()

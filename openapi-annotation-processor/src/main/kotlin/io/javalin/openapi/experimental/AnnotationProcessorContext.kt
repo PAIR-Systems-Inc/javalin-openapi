@@ -23,6 +23,9 @@ class AnnotationProcessorContext(
     val trees: Trees?,
 ) {
 
+    private fun sanitizeTypeName(name: String): String =
+        name.replace(Regex("@[^\\s]+\\s*"), "").trim()
+
     val types: Types = env.typeUtils
     val typeSchemaGenerator: TypeSchemaGenerator = TypeSchemaGenerator(this)
     var roundEnv: RoundEnvironment? = null
@@ -63,9 +66,9 @@ class AnnotationProcessorContext(
         env.typeUtils.asElement(mirror)
             ?.getAnnotation(OpenApiName::class.java)
             ?.value
-            ?.let { mirror.toString().substringBeforeLast(".") + "." + it }
+            ?.let { sanitizeTypeName(mirror.toString()).substringBefore("<").substringBeforeLast(".") + "." + it }
             ?: env.typeUtils.asElement(mirror)?.toString()?.substringBefore("<")
-            ?: mirror.toString().substringBefore("<")
+            ?: sanitizeTypeName(mirror.toString()).substringBefore("<")
 
     /* Extension methods, should be replaced by context receivers in the future */
 
