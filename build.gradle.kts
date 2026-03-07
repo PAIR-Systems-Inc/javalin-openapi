@@ -22,13 +22,19 @@ allprojects {
     repositories {
         mavenCentral()
         maven("https://maven.reposilite.com/snapshots")
-        maven("https://jitpack.io")
     }
 
     publishing {
         repositories {
-            // JitPack builds directly from GitHub releases/tags
-            // No explicit repository configuration needed
+            maven {
+                name = "reposilite-repository"
+                url = uri("https://maven.reposilite.com/${if (version.toString().endsWith("-SNAPSHOT")) "snapshots" else "releases"}")
+
+                credentials {
+                    username = getEnvOrProperty("MAVEN_NAME", "mavenUser")
+                    password = getEnvOrProperty("MAVEN_TOKEN", "mavenPassword")
+                }
+            }
         }
     }
 
@@ -138,6 +144,8 @@ tasks.register("test-maven-examples") {
 nexusPublishing {
     repositories {
         sonatype {
+            nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://central.sonatype.com/repository/maven-snapshots/"))
             username.set(getEnvOrProperty("SONATYPE_USER", "sonatypeUser"))
             password.set(getEnvOrProperty("SONATYPE_PASSWORD", "sonatypePassword"))
         }

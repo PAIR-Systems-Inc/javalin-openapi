@@ -9,7 +9,6 @@ import java.util.function.Supplier
 
 internal class JavalinBehindProxy(
     javalinSupplier: Supplier<Javalin>,
-    private val port: Int,
     basePath: String
 ) : AutoCloseable {
 
@@ -47,6 +46,10 @@ internal class JavalinBehindProxy(
         awaitStart.await()
     }
 
+    fun proxyPort(): Int = proxy.port()
+
+    fun appPort(): Int = javalin.port()
+
     fun stop() {
         proxy.stop()
         javalin.stop()
@@ -64,6 +67,6 @@ internal class JavalinBehindProxy(
     }
 
     private fun Context.javalinLocation(): String =
-        "http://localhost:${port + 1}/${pathParamMap()["uri"] ?: ""}"
+        "http://localhost:${appPort()}/${pathParamMap()["uri"] ?: ""}"
 
 }
