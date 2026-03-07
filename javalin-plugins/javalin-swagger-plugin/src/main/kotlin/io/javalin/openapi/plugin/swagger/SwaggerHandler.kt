@@ -31,7 +31,7 @@ sealed class SwaggerVersionMapping(val name: String) {
 class SwaggerHandler(
     private val title: String,
     private val documentationPath: String,
-    private val versions: Set<String>,
+    private val versions: List<SwaggerVersionMapping>,
     private val swaggerVersion: String,
     private val validatorUrl: String?,
     private val routingPath: String,
@@ -55,6 +55,7 @@ class SwaggerHandler(
         val rootPath = (basePath ?: "") + routingPath
         val publicSwaggerAssetsPath = "$rootPath/webjars/swagger-ui/$swaggerVersion".removedDoubledPathOperators()
         val publicDocumentationPath = (rootPath + documentationPath).removedDoubledPathOperators()
+
         val allDocumentations = versions
             .joinToString(separator = ",\n") {
                 when (it) {

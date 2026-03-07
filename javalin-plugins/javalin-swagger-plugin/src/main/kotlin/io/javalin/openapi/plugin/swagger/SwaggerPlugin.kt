@@ -71,7 +71,7 @@ class SwaggerConfiguration @JvmOverloads constructor(
     /** Inject custom CSS stylesheet into Swagger UI */
     @JvmOverloads
     fun injectStylesheet(path: String, media: String = "screen"): SwaggerConfiguration = also {
-        customStylesheetFiles.add(Pair(path, media));
+        customStylesheetFiles.add(path to media)
     }
 
     /** Inject custom JavaScript file into Swagger UI */
@@ -115,7 +115,7 @@ open class SwaggerPlugin @JvmOverloads constructor(
         )
 
         val swaggerEndpoint = SwaggerEndpoint(
-            method = HandlerType.GET,
+            method = GET,
             path = pluginConfig.uiPath,
             roles = pluginConfig.roles.toSet(),
             handler = swaggerHandler
