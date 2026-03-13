@@ -529,6 +529,32 @@ internal class TypeMappersTest : OpenApiAnnotationProcessorSpecification() {
             ))
     }
 
+    private class UntypedMetadataEnvelope(
+        @get:OpenApiDescription("Arbitrary JSON metadata")
+        @get:OpenApiObjectValidation(additionalProperties = true)
+        val metadata: Any
+    )
+
+    @OpenApi(
+        path = "untyped-metadata-envelope",
+        versions = ["should_support_object_additional_properties_without_fixed_value_shape"],
+        responses = [
+            OpenApiResponse(
+                status = "200",
+                content = [OpenApiContent(from = UntypedMetadataEnvelope::class)],
+            ),
+        ],
+    )
+    @Test
+    fun should_support_object_additional_properties_without_fixed_value_shape() =
+        withOpenApi("should_support_object_additional_properties_without_fixed_value_shape") {
+            assertThatJson(it)
+                .inPath("$.components.schemas.UntypedMetadataEnvelope.properties.metadata")
+                .isObject
+                .containsEntry("type", "object")
+                .containsEntry("additionalProperties", true)
+        }
+
     private class Loop(
         val self: Loop?,
     )

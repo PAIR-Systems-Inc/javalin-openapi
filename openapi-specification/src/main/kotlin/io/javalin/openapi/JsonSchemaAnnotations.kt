@@ -41,6 +41,36 @@ annotation class OneOf(
     val discriminator: Discriminator = Discriminator()
 )
 
+/**
+ * Adds a JSON Schema `oneOf` constraint to an object schema using property-presence groups.
+ *
+ * <p>Each nested group becomes a subschema of the form `{ "required": ["..."] }`, allowing
+ * DTOs that expose multiple nullable fields to still express one-of semantics without defining
+ * separate wrapper types.
+ */
+@Target(CLASS)
+@Retention(RUNTIME)
+annotation class OpenApiOneOfProperties(
+    vararg val value: OpenApiRequiredProperties
+)
+
+/**
+ * Adds a JSON Schema `anyOf` constraint to an object schema using property-presence groups.
+ *
+ * <p>Each nested group becomes a subschema of the form `{ "required": ["..."] }`.
+ */
+@Target(CLASS)
+@Retention(RUNTIME)
+annotation class OpenApiAnyOfProperties(
+    vararg val value: OpenApiRequiredProperties
+)
+
+/** A required-property group used by [OpenApiOneOfProperties] and [OpenApiAnyOfProperties]. */
+@Retention(RUNTIME)
+annotation class OpenApiRequiredProperties(
+    vararg val value: String
+)
+
 @Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD, CLASS)
 @Retention(RUNTIME)
 annotation class AnyOf(

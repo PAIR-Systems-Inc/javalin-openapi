@@ -111,6 +111,8 @@ class TypeSchemaGenerator(val context: AnnotationProcessorContext) {
                     properties.filter { it.required }.forEach { required.add(it.name) }
                     schema.set<JsonNode>("required", required)
                 }
+
+                addPropertyPresenceConstraints(source, schema)
             }
         }
 
@@ -223,6 +225,52 @@ class TypeSchemaGenerator(val context: AnnotationProcessorContext) {
     }
 
 }
+
+private fun addPropertyPresenceConstraints(source: Element, schema: ObjectNode) {
+    source.getAnnotation(OpenApiOneOfProperties::class.java)?.let {
+        schema.set<JsonNode>("oneOf", buildRequiredGroups(it.value))
+    }
+    source.getAnnotation(OpenApiAnyOfProperties::class.java)?.let {
+        schema.set<JsonNode>("anyOf", buildRequiredGroups(it.value))
+    }
+}
+
+private fun buildRequiredGroups(groups: Array<out OpenApiRequiredProperties>): ArrayNode =
+    createArrayNode().also { composition ->
+        groups
+            .mapNotNull { group ->
+                group.value
+                    .filter { it.isNotBlank() }
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { requiredProperties ->
+                        createObjectNode().also { groupSchema ->
+                            groupSchema.set<JsonNode>(
+                                "required",
+                                createArrayNode().also { required ->
+                                    requiredProperties.forEach(required::add)
+                                }
+                            )
+                            groupSchema.set<JsonNode>(
+                                "properties",
+                                createObjectNode().also { properties ->
+                                    requiredProperties.forEach { propertyName ->
+                                        properties.set<JsonNode>(
+                                            propertyName,
+                                            createObjectNode().also { propertySchema ->
+                                                propertySchema.set<JsonNode>(
+                                                    "not",
+                                                    createObjectNode().put("type", "null")
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+            }
+            .forEach(composition::add)
+    }
 
 internal fun AnnotationProcessorContext.findAllProperties(type: ClassDefinition, requireNonNulls: Boolean): Collection<Property> = inContext {
     val source = type.source
@@ -373,6 +421,32 @@ private fun Element.findExtra(context: AnnotationProcessorContext): Map<String, 
         }
     }
 
+    getAnnotationsByType(OpenApiDefault::class.java).forEach { default ->
+        when {
+            default.value != NULL_STRING -> {
+                extra["default"] = default.value
+            }
+            default.raw != NULL_STRING -> {
+                extra["default"] = jsonMapper.readTree(default.raw)
+            }
+            default.objects.isNotEmpty() -> {
+                val result = ExampleGenerator.generateFromExamples(default.objects.map { it.toExampleProperty() })
+                extra["default"] = result.jsonElement ?: result.simpleValue
+            }
+        }
+    }
+
+    getAnnotationsByType(OpenApiAllowedValues::class.java)
+        .map { it.value.filter(String::isNotBlank) }
+        .filter(List<String>::isNotEmpty)
+        .lastOrNull()
+        ?.let { values ->
+            extra["enum"] =
+                createArrayNode().also { enumValues ->
+                    values.forEach(enumValues::add)
+                }
+        }
+
     getAnnotationsByType(OpenApiNumberValidation::class.java).forEach { validation ->
         extra["minimum"] = validation.minimum.takeIf { it != NULL_STRING }?.toBigDecimal()
         extra["maximum"] = validation.maximum.takeIf { it != NULL_STRING }?.toBigDecimal()
@@ -397,6 +471,7 @@ private fun Element.findExtra(context: AnnotationProcessorContext): Map<String, 
     getAnnotationsByType(OpenApiObjectValidation::class.java).forEach { validation ->
         extra["minProperties"] = validation.minProperties.takeIf { it != NULL_STRING }?.toInt()
         extra["maxProperties"] = validation.maxProperties.takeIf { it != NULL_STRING }?.toInt()
+        extra["additionalProperties"] = validation.additionalProperties.takeIf { it }
     }
 
     getAnnotationsByType(Custom::class.java).forEach { custom ->

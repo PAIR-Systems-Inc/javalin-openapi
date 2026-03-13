@@ -14,6 +14,8 @@ import io.javalin.openapi.OpenApi
 import io.javalin.openapi.OpenApiContent
 import io.javalin.openapi.OpenApiName
 import io.javalin.openapi.OpenApiNullable
+import io.javalin.openapi.OpenApiOneOfProperties
+import io.javalin.openapi.OpenApiRequiredProperties
 import io.javalin.openapi.OpenApiResponse
 import io.javalin.openapi.processor.specification.OpenApiAnnotationProcessorSpecification
 import net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson
@@ -225,6 +227,53 @@ internal class CompositionTest : OpenApiAnnotationProcessorSpecification() {
                 }
             """))
     }
+
+    @JsonSchema
+    @OpenApiOneOfProperties(
+        OpenApiRequiredProperties("text"),
+        OpenApiRequiredProperties("binary")
+    )
+    class NullableMemberUnion(
+        @get:OpenApiNullable
+        val text: String? = null,
+        @get:OpenApiNullable
+        val binary: String? = null
+    )
+
+    @Test
+    fun should_require_non_null_values_in_openapi_oneof_property_groups() =
+        withJsonScheme(NullableMemberUnion::class.java.canonicalName) {
+            assertThatJson(it)
+                .inPath("oneOf")
+                .isEqualTo(
+                    json(
+                        """
+                        [
+                          {
+                            "required": ["text"],
+                            "properties": {
+                              "text": {
+                                "not": {
+                                  "type": "null"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "required": ["binary"],
+                            "properties": {
+                              "binary": {
+                                "not": {
+                                  "type": "null"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                        """
+                    )
+                )
+        }
 
     // Discriminator tests
 

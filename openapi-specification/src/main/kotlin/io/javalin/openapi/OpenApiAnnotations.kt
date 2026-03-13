@@ -107,6 +107,8 @@ annotation class OpenApiParam(
     val deprecated: Boolean = false,
     val required: Boolean = false,
     val allowEmptyValue: Boolean = false,
+    val allowedValues: Array<String> = [],
+    val defaultValue: String = NULL_STRING,
     val example: String = ""
 )
 
@@ -243,6 +245,21 @@ annotation class OpenApiExample(
     val objects: Array<OpenApiExampleProperty> = []
 )
 
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
+@Retention(RUNTIME)
+annotation class OpenApiDefault(
+    val value: String = NULL_STRING,
+    /** For more complex defaults, you can use the `raw` field to provide a JSON string that will be parsed as a default. */
+    val raw: String = NULL_STRING,
+    val objects: Array<OpenApiExampleProperty> = []
+)
+
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)
+@Retention(RUNTIME)
+annotation class OpenApiAllowedValues(
+    vararg val value: String
+)
+
 enum class ExampleValueType {
     STRING,
     NUMBER,
@@ -311,6 +328,7 @@ annotation class OpenApiArrayValidation(
 annotation class OpenApiObjectValidation(
     val minProperties: String = NULL_STRING,
     val maxProperties: String = NULL_STRING,
+    val additionalProperties: Boolean = false,
 )
 
 @Target(CLASS, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER, FIELD)

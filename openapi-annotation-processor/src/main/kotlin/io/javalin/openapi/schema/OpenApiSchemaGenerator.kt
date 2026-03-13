@@ -110,6 +110,8 @@ class OpenApiSchemaGenerator(
                         required = parameterAnnotation.required || parameterType == In.PATH,
                         deprecated = parameterAnnotation.deprecated,
                         allowEmptyValue = parameterAnnotation.allowEmptyValue,
+                        allowedValues = parameterAnnotation.allowedValues.toList(),
+                        defaultValue = parameterAnnotation.defaultValue.takeIf { it != NULL_STRING },
                         example = parameterAnnotation.example.takeIf { it.isNotEmpty() },
                     )
                 }
@@ -146,6 +148,8 @@ class OpenApiSchemaGenerator(
                                 required = headerParam.required,
                                 deprecated = headerParam.deprecated,
                                 allowEmptyValue = headerParam.allowEmptyValue,
+                                allowedValues = headerParam.allowedValues.toList(),
+                                defaultValue = headerParam.defaultValue.takeIf { it != NULL_STRING },
                                 example = headerParam.example.takeIf { it.isNotEmpty() },
                             )
                         }

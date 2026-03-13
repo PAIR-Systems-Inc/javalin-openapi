@@ -21,7 +21,9 @@ import io.javalin.openapi.experimental.processor.generators.toExampleProperty
 import io.javalin.openapi.experimental.processor.shared.createArrayNode
 import io.javalin.openapi.experimental.processor.shared.createObjectNode
 import io.javalin.openapi.experimental.processor.shared.jsonMapper
+import java.util.LinkedHashMap
 import java.util.TreeMap
+import java.util.TreeSet
 import java.util.function.Consumer
 
 fun interface ComponentSchemaResolver {
@@ -180,7 +182,48 @@ class OpenApiSchemaBuilder {
         val components = root.get("components") as? ObjectNode ?: createObjectNode()
         components.set<JsonNode>("schemas", componentSchemas)
         root.set<JsonNode>("components", components)
+        populateTopLevelTags()
+        root.coerceTypedExamplesInPlace()
         return root
+    }
+
+    private fun populateTopLevelTags() {
+        val tagEntries = LinkedHashMap<String, ObjectNode>()
+
+        (root.get("tags") as? ArrayNode)
+            ?.forEach { tag ->
+                val tagObject = tag as? ObjectNode ?: return@forEach
+                val name = tagObject.path("name").asText().takeIf(String::isNotBlank) ?: return@forEach
+                tagEntries.putIfAbsent(name, tagObject.deepCopy())
+            }
+
+        collectOperationTagNames().forEach { tagName ->
+            tagEntries.putIfAbsent(tagName, createObjectNode().put("name", tagName))
+        }
+
+        if (tagEntries.isEmpty()) {
+            root.remove("tags")
+            return
+        }
+
+        val tagsArray = createArrayNode()
+        tagEntries.values.forEach(tagsArray::add)
+        root.set<JsonNode>("tags", tagsArray)
+    }
+
+    private fun collectOperationTagNames(): Set<String> {
+        val names = TreeSet<String>()
+        paths.properties().forEach { (_, pathItem) ->
+            val pathObject = pathItem as? ObjectNode ?: return@forEach
+            pathObject.properties().forEach { (_, operation) ->
+                val operationObject = operation as? ObjectNode ?: return@forEach
+                val tags = operationObject.get("tags") as? ArrayNode ?: return@forEach
+                tags.forEach { tag ->
+                    tag.asText().takeIf(String::isNotBlank)?.let(names::add)
+                }
+            }
+        }
+        return names
     }
 
     fun toJson(): String = buildRoot().toPrettyString()
@@ -402,10 +445,13 @@ class ParametersBuilder(
         required: Boolean = false,
         deprecated: Boolean = false,
         allowEmptyValue: Boolean = false,
+        allowedValues: List<String> = emptyList(),
+        defaultValue: String? = null,
         example: String? = null,
     ) {
         refCollector(schema.references)
-        val schemaJson = schema.json
+        val schemaJson = (schema.json.deepCopy() as? ObjectNode) ?: schema.json
+        schemaJson.applyAllowedValuesAndDefault(allowedValues, defaultValue)
         val param = createObjectNode()
         param.put("name", name)
         param.put("in", location)
@@ -437,6 +483,8 @@ class ParametersBuilder(
         required: Boolean = false,
         deprecated: Boolean = false,
         allowEmptyValue: Boolean = false,
+        allowedValues: List<String> = emptyList(),
+        defaultValue: String? = null,
         example: String? = null,
         schema: SchemaBuilder.() -> Unit,
     ) {
@@ -448,6 +496,8 @@ class ParametersBuilder(
             required = required,
             deprecated = deprecated,
             allowEmptyValue = allowEmptyValue,
+            allowedValues = allowedValues,
+            defaultValue = defaultValue,
             example = example,
         )
     }
@@ -459,9 +509,22 @@ class ParametersBuilder(
         required: Boolean,
         deprecated: Boolean,
         allowEmptyValue: Boolean,
+        allowedValues: List<String> = emptyList(),
+        defaultValue: String? = null,
         example: String?,
         schema: Consumer<SchemaBuilder>,
-    ) = parameter(name, location, description, required, deprecated, allowEmptyValue, example) { schema.accept(this) }
+    ) =
+        parameter(
+            name,
+            location,
+            description,
+            required,
+            deprecated,
+            allowEmptyValue,
+            allowedValues,
+            defaultValue,
+            example,
+        ) { schema.accept(this) }
 
     internal fun build(): ArrayNode = parameters
 }
@@ -793,10 +856,13 @@ class HeadersBuilder(
         required: Boolean = false,
         deprecated: Boolean = false,
         allowEmptyValue: Boolean = false,
+        allowedValues: List<String> = emptyList(),
+        defaultValue: String? = null,
         example: String? = null,
     ) {
         refCollector(schema.references)
-        val schemaJson = schema.json
+        val schemaJson = (schema.json.deepCopy() as? ObjectNode) ?: schema.json
+        schemaJson.applyAllowedValuesAndDefault(allowedValues, defaultValue)
         val header = createObjectNode()
         description?.let { header.put("description", it) }
         if (required) {
@@ -821,6 +887,8 @@ class HeadersBuilder(
         required: Boolean = false,
         deprecated: Boolean = false,
         allowEmptyValue: Boolean = false,
+        allowedValues: List<String> = emptyList(),
+        defaultValue: String? = null,
         example: String? = null,
         schema: SchemaBuilder.() -> Unit,
     ) {
@@ -831,6 +899,8 @@ class HeadersBuilder(
             required = required,
             deprecated = deprecated,
             allowEmptyValue = allowEmptyValue,
+            allowedValues = allowedValues,
+            defaultValue = defaultValue,
             example = example,
         )
     }
@@ -841,11 +911,41 @@ class HeadersBuilder(
         required: Boolean,
         deprecated: Boolean,
         allowEmptyValue: Boolean,
+        allowedValues: List<String> = emptyList(),
+        defaultValue: String? = null,
         example: String?,
         schema: Consumer<SchemaBuilder>,
-    ) = header(name, description, required, deprecated, allowEmptyValue, example) { schema.accept(this) }
+    ) =
+        header(
+            name,
+            description,
+            required,
+            deprecated,
+            allowEmptyValue,
+            allowedValues,
+            defaultValue,
+            example,
+        ) { schema.accept(this) }
 
     internal fun build(): ObjectNode = headers
+}
+
+private fun JsonNode.applyAllowedValuesAndDefault(
+    allowedValues: List<String>,
+    defaultValue: String?,
+) {
+    val schemaObject = this as? ObjectNode ?: return
+
+    if (allowedValues.isNotEmpty()) {
+        schemaObject.set<JsonNode>(
+            "enum",
+            createArrayNode().also { values -> allowedValues.forEach(values::add) },
+        )
+    }
+
+    if (defaultValue != null) {
+        schemaObject.put("default", defaultValue)
+    }
 }
 
 @OpenApiSchemaDsl

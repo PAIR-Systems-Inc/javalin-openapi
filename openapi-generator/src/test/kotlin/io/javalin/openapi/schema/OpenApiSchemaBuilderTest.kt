@@ -1,6 +1,8 @@
 package io.javalin.openapi.schema
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
 import io.javalin.openapi.experimental.ClassDefinition
 import io.javalin.openapi.experimental.processor.generators.ResultScheme
 import io.javalin.openapi.experimental.processor.shared.createArrayNode
@@ -82,6 +84,19 @@ internal class OpenApiSchemaBuilderTest {
 
             assert(!compact.contains("\n"))
             assertThatJson(compact).isObject.containsEntry("openapi", "3.1.0")
+        }
+
+        @Test
+        fun `should collect operation tags into top-level tags array`() {
+            val schema = builder()
+            schema.path("/users").operation("get") { tags("Users") }
+            schema.path("/admin").operation("get") { tags("Administration", "Users") }
+            val json = schema.toJson()
+
+            assertThatJson(json).inPath("$.tags").isArray.containsExactly(
+                json("""{"name":"Administration"}"""),
+                json("""{"name":"Users"}"""),
+            )
         }
     }
 
@@ -287,6 +302,102 @@ internal class OpenApiSchemaBuilderTest {
         }
 
         @Test
+        fun `should coerce typed parameter examples`() {
+            val schema = builder()
+            schema.path("/test").operation("get") {
+                parameters {
+                    parameter(name = "limit", location = "query", example = "10") { type("integer") }
+                    parameter(name = "dryRun", location = "query", example = "false") { type("boolean") }
+                    parameter(name = "minScore", location = "query", example = "0.5") { type("number") }
+                }
+            }
+
+            assertThatJson(schema.toJson()).inPath("$.paths['/test'].get.parameters[0].example").isEqualTo(10)
+            assertThatJson(schema.toJson()).inPath("$.paths['/test'].get.parameters[1].example").isEqualTo(false)
+            assertThatJson(schema.toJson()).inPath("$.paths['/test'].get.parameters[2].example").isEqualTo(0.5)
+        }
+
+        @Test
+        fun `should build parameter enums and typed defaults`() {
+            val schema = builder()
+            schema.path("/test").operation("get") {
+                parameters {
+                    parameter(
+                        name = "sortBy",
+                        location = "query",
+                        allowedValues = listOf("created_time", "updated_time", "name"),
+                        defaultValue = "created_time",
+                    ) { type("string") }
+                    parameter(
+                        name = "maxResults",
+                        location = "query",
+                        defaultValue = "50",
+                    ) { type("integer") }
+                }
+            }
+
+            val json = schema.toJson()
+
+            assertThatJson(json).inPath("$.paths['/test'].get.parameters[0].schema.enum")
+                .isEqualTo(json("""["created_time","updated_time","name"]"""))
+            assertThatJson(json).inPath("$.paths['/test'].get.parameters[0].schema.default")
+                .isEqualTo("created_time")
+            assertThatJson(json).inPath("$.paths['/test'].get.parameters[1].schema.default")
+                .isEqualTo(50)
+        }
+
+        @Test
+        fun `should coerce structured schema examples and defaults from textual json`() {
+            val document = ObjectMapper().readTree(
+                """
+                {
+                  "openapi": "3.1.0",
+                  "info": { "title": "", "version": "" },
+                  "paths": {
+                    "/test": {
+                      "post": {
+                        "responses": {},
+                        "requestBody": {
+                          "content": {
+                            "application/json": {
+                              "schema": {
+                                "type": "object",
+                                "properties": {
+                                  "labels": {
+                                    "type": "object",
+                                    "additionalProperties": { "type": "string" },
+                                    "example": "{\"env\":\"dev\"}"
+                                  },
+                                  "modalities": {
+                                    "type": "array",
+                                    "items": { "type": "string" },
+                                    "default": "[\"TEXT\"]"
+                                  }
+                                }
+                              },
+                              "example": "{\"labels\":{\"env\":\"prod\"},\"modalities\":[\"TEXT\"]}"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "components": { "schemas": {} }
+                }
+                """.trimIndent()
+            ) as ObjectNode
+
+            document.coerceTypedExamplesInPlace()
+
+            assertThatJson(document.toString()).inPath("$.paths['/test'].post.requestBody.content['application/json'].schema.properties.labels.example")
+                .isEqualTo(json("""{"env":"dev"}"""))
+            assertThatJson(document.toString()).inPath("$.paths['/test'].post.requestBody.content['application/json'].schema.properties.modalities.default")
+                .isEqualTo(json("""["TEXT"]"""))
+            assertThatJson(document.toString()).inPath("$.paths['/test'].post.requestBody.content['application/json'].example")
+                .isEqualTo(json("""{"labels":{"env":"prod"},"modalities":["TEXT"]}"""))
+        }
+
+        @Test
         fun `should build request body with content`() {
             val schema = builder()
             schema.path("/users").operation("post") {
@@ -343,6 +454,27 @@ internal class OpenApiSchemaBuilderTest {
         }
 
         @Test
+        fun `should coerce typed header examples`() {
+            val schema = builder()
+            schema.path("/test").operation("get") {
+                responses {
+                    response("200") {
+                        description("OK")
+                        headers {
+                            header("X-Retry-After", example = "5") { type("integer") }
+                            header("X-Debug-Enabled", example = "true") { type("boolean") }
+                        }
+                    }
+                }
+            }
+
+            assertThatJson(schema.toJson()).inPath("$.paths['/test'].get.responses['200'].headers['X-Retry-After'].example")
+                .isEqualTo(5)
+            assertThatJson(schema.toJson()).inPath("$.paths['/test'].get.responses['200'].headers['X-Debug-Enabled'].example")
+                .isEqualTo(true)
+        }
+
+        @Test
         fun `should build content with example`() {
             val schema = builder()
             schema.path("/test").operation("get") {
@@ -356,6 +488,61 @@ internal class OpenApiSchemaBuilderTest {
 
             assertThatJson(schema.toJson()).inPath("$.paths['/test'].get.responses['200'].content['text/plain']").isObject
                 .containsEntry("example", "hello world")
+        }
+
+        @Test
+        fun `should coerce schema and content examples using referenced schemas`() {
+            val searchRequestSchema = ResultScheme(
+                createObjectNode().apply {
+                    put("type", "object")
+                    set<JsonNode>("properties", createObjectNode().apply {
+                        set<JsonNode>("enabled", createObjectNode().apply {
+                            put("type", "boolean")
+                            put("example", "true")
+                        })
+                        set<JsonNode>("limit", createObjectNode().apply {
+                            put("type", "integer")
+                            put("example", "10")
+                        })
+                        set<JsonNode>("threshold", createObjectNode().apply {
+                            put("type", "number")
+                            put("example", "0.5")
+                        })
+                    })
+                },
+                emptySet(),
+            )
+
+            val example = createObjectNode().apply {
+                put("enabled", "false")
+                put("limit", "25")
+                put("threshold", "0.75")
+            }
+
+            val schema = builder()
+            schema.addComponentSchema("SearchRequest", searchRequestSchema)
+            schema.path("/test").operation("post") {
+                requestBody {
+                    content {
+                        mediaType("application/json") {
+                            schema { ref("#/components/schemas/SearchRequest") }
+                            exampleJson(example)
+                        }
+                    }
+                }
+            }
+
+            val json = schema.toJson()
+
+            assertThatJson(json).inPath("$.components.schemas.SearchRequest.properties.enabled.example").isEqualTo(true)
+            assertThatJson(json).inPath("$.components.schemas.SearchRequest.properties.limit.example").isEqualTo(10)
+            assertThatJson(json).inPath("$.components.schemas.SearchRequest.properties.threshold.example").isEqualTo(0.5)
+            assertThatJson(json).inPath("$.paths['/test'].post.requestBody.content['application/json'].example.enabled")
+                .isEqualTo(false)
+            assertThatJson(json).inPath("$.paths['/test'].post.requestBody.content['application/json'].example.limit")
+                .isEqualTo(25)
+            assertThatJson(json).inPath("$.paths['/test'].post.requestBody.content['application/json'].example.threshold")
+                .isEqualTo(0.75)
         }
     }
 
@@ -939,6 +1126,33 @@ internal class OpenApiSchemaBuilderTest {
 
             assertThatJson(json).inPath("$.paths['/new'].get.summary").isEqualTo("New endpoint")
             assertThatJson(json).inPath("$.openapi").isEqualTo("3.1.0")
+        }
+
+        @Test
+        fun `should preserve existing top-level tags while adding discovered ones`() {
+            val original =
+                """
+                {
+                  "openapi": "3.1.0",
+                  "info": { "title": "API", "version": "1.0" },
+                  "tags": [{ "name": "Users", "description": "User operations" }],
+                  "paths": {
+                    "/admin": {
+                      "get": {
+                        "tags": ["Administration"],
+                        "responses": {}
+                      }
+                    }
+                  },
+                  "components": { "schemas": {} }
+                }
+                """.trimIndent()
+            val json = OpenApiSchemaBuilder.fromJson(original).toJson()
+
+            assertThatJson(json).inPath("$.tags").isArray.contains(
+                json("""{"name":"Users","description":"User operations"}"""),
+                json("""{"name":"Administration"}"""),
+            )
         }
     }
 
