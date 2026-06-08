@@ -18,7 +18,7 @@ mongodb-bson = "5.6.3"
 
 junit = "5.14.2"
 logback = "1.5.32"
-assertj = "3.27.6"
+assertj = "3.27.7"
 lombok = "1.18.42"
 json-unit = "4.1.1"
 unirest = "3.14.5"
