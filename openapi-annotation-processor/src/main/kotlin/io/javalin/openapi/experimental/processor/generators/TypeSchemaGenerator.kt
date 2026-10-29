@@ -42,6 +42,7 @@ class TypeSchemaGenerator(val context: AnnotationProcessorContext) {
 
                 val namingStrategy = source.getAnnotation(OpenApiNaming::class.java)?.value
                 val values = createArrayNode()
+                val descriptions = createArrayNode()
 
                 source.enclosedElements
                     .filterIsInstance<VariableElement>()
@@ -49,23 +50,32 @@ class TypeSchemaGenerator(val context: AnnotationProcessorContext) {
                     .filter { context.isAssignable(it.asType(), type.mirror) }
                     .map { element ->
                         val customName = element.getAnnotation(OpenApiName::class.java)
-                        when {
+                        val description = element.getAnnotation(OpenApiDescription::class.java)
+                        val name = when {
                             customName != null -> customName.value
                             namingStrategy != null -> translatePropertyName(namingStrategy, element.toSimpleName())
                             else -> element.toSimpleName()
                         }
+
+                        Pair(name, description?.value ?: "")
                     }
-                    .forEach { name ->
+                    .forEach { (name, description) ->
                         if (enumType != null && enumType.type != "string") {
                             values.add(jsonMapper.readTree(name))
                         } else {
                             values.add(name)
                         }
+
+                        descriptions.add(description)
                     }
 
                 schema.put("type", enumType?.type ?: "string")
                 enumType?.format?.also { schema.put("format", it) }
                 schema.set<JsonNode>("enum", values)
+
+                if (descriptions.find({ description -> description.isTextual && description.asText().isNotEmpty()}) != null) {
+                    schema.set<JsonNode>("x-enum-descriptions", descriptions)
+                }
 
                 val extra = source.findExtra(context)
                 schema.addExtra(extra)
@@ -232,6 +242,20 @@ private fun addPropertyPresenceConstraints(source: Element, schema: ObjectNode) 
     }
     source.getAnnotation(OpenApiAnyOfProperties::class.java)?.let {
         schema.set<JsonNode>("anyOf", buildRequiredGroups(it.value))
+    }
+    source.getAnnotation(OpenApiNotProperties::class.java)?.let {
+        val groups = buildRequiredGroups(it.value)
+        if (groups.isEmpty) {
+            return@let
+        }
+        schema.set<JsonNode>(
+            "not",
+            if (groups.size() == 1) {
+                groups.get(0)
+            } else {
+                createObjectNode().set<JsonNode>("anyOf", groups)
+            }
+        )
     }
 }
 

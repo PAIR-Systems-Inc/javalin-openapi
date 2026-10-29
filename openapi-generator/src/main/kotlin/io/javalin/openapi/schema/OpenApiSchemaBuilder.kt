@@ -448,6 +448,8 @@ class ParametersBuilder(
         allowedValues: List<String> = emptyList(),
         defaultValue: String? = null,
         example: String? = null,
+        /** Whether the value is JSON-encoded, so the schema goes under `content` instead of `schema`. */
+        jsonEncoded: Boolean = schema.references.isNotEmpty(),
     ) {
         refCollector(schema.references)
         val schemaJson = (schema.json.deepCopy() as? ObjectNode) ?: schema.json
@@ -459,7 +461,15 @@ class ParametersBuilder(
         if (required) param.put("required", true)
         if (deprecated) param.put("deprecated", true)
         if (allowEmptyValue) param.put("allowEmptyValue", true)
-        param.set<JsonNode>("schema", schemaJson)
+        if (jsonEncoded) {
+            val mediaTypeNode = createObjectNode()
+            mediaTypeNode.set<JsonNode>("schema", schemaJson)
+            val contentNode = createObjectNode()
+            contentNode.set<JsonNode>("application/json", mediaTypeNode)
+            param.set<JsonNode>("content", contentNode)
+        } else {
+            param.set<JsonNode>("schema", schemaJson)
+        }
         if (example != null) {
             param.put("example", example)
         }

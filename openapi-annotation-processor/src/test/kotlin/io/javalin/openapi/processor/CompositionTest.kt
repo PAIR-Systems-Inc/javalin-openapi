@@ -13,6 +13,7 @@ import io.javalin.openapi.OneOf
 import io.javalin.openapi.OpenApi
 import io.javalin.openapi.OpenApiContent
 import io.javalin.openapi.OpenApiName
+import io.javalin.openapi.OpenApiNotProperties
 import io.javalin.openapi.OpenApiNullable
 import io.javalin.openapi.OpenApiOneOfProperties
 import io.javalin.openapi.OpenApiRequiredProperties
@@ -270,6 +271,45 @@ internal class CompositionTest : OpenApiAnnotationProcessorSpecification() {
                             }
                           }
                         ]
+                        """
+                    )
+                )
+        }
+
+    @JsonSchema
+    @OpenApiNotProperties(
+        OpenApiRequiredProperties("replaceLabels", "mergeLabels")
+    )
+    class OptionalExclusiveUpdate(
+        @get:OpenApiNullable
+        val replaceLabels: String? = null,
+        @get:OpenApiNullable
+        val mergeLabels: String? = null
+    )
+
+    @Test
+    fun should_generate_not_constraint_for_forbidden_property_groups() =
+        withJsonScheme(OptionalExclusiveUpdate::class.java.canonicalName) {
+            assertThatJson(it)
+                .inPath("not")
+                .isEqualTo(
+                    json(
+                        """
+                        {
+                          "required": ["replaceLabels", "mergeLabels"],
+                          "properties": {
+                            "replaceLabels": {
+                              "not": {
+                                "type": "null"
+                              }
+                            },
+                            "mergeLabels": {
+                              "not": {
+                                "type": "null"
+                              }
+                            }
+                          }
+                        }
                         """
                     )
                 )

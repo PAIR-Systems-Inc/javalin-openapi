@@ -27,6 +27,11 @@ allprojects {
     version = releaseVersion
 
     repositories {
+        maven {
+            // Maven Central GCS mirror first — see the root build.gradle.kts note.
+            name = "MavenCentralGcsMirror"
+            url = uri("https://maven-central.storage-download.googleapis.com/maven2")
+        }
         mavenCentral()
     }
 
