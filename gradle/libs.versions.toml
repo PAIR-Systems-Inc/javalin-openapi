@@ -1,7 +1,7 @@
 [versions]
 nexus-publish = "2.0.0"
 
-kotlin = "2.3.10"
+kotlin = "2.4.21"
 javalin = "7.2.4"
 
 jackson = "2.22.1"
