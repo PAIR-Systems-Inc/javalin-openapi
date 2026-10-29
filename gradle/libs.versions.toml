@@ -4,23 +4,23 @@ nexus-publish = "2.0.0"
 kotlin = "2.3.10"
 javalin = "7.2.4"
 
-jackson = "2.21.0"
-jackson-annotations = "2.21"
+jackson = "2.22.1"
+jackson-annotations = "2.22"
 
 swagger-parser = "2.1.38"
-swagger-ui = "5.31.2"
+swagger-ui = "5.32.8"
 js-tokens = "8.0.3"
 redoc = "2.5.0"
 
 jakarta-validation = "3.1.1"
 groovy = "4.0.30"
-mongodb-bson = "5.6.3"
+mongodb-bson = "5.9.0"
 
-junit = "5.14.2"
-logback = "1.5.32"
+junit = "6.1.1"
+logback = "1.5.37"
 assertj = "3.27.7"
-lombok = "1.18.42"
-json-unit = "4.1.1"
+lombok = "1.18.46"
+json-unit = "6.0.1"
 unirest = "3.14.5"
 
 [libraries]

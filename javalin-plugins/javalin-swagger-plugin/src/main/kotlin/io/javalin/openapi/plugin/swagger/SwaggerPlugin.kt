@@ -19,7 +19,7 @@ class SwaggerConfiguration @JvmOverloads constructor(
     /** Specify custom base path if Javalin is running behind reverse proxy */
     @JvmField var basePath: String? = null,
     /** Swagger UI Bundle version */
-    @JvmField var version: String = "5.31.2",
+    @JvmField var version: String = "5.32.8",
     /** Swagger UI Bundle webjar location */
     @JvmField var webJarPath: String = "/webjars/swagger-ui",
     /** Page title */

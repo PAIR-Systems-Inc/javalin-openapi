@@ -243,6 +243,20 @@ private fun addPropertyPresenceConstraints(source: Element, schema: ObjectNode) 
     source.getAnnotation(OpenApiAnyOfProperties::class.java)?.let {
         schema.set<JsonNode>("anyOf", buildRequiredGroups(it.value))
     }
+    source.getAnnotation(OpenApiNotProperties::class.java)?.let {
+        val groups = buildRequiredGroups(it.value)
+        if (groups.isEmpty) {
+            return@let
+        }
+        schema.set<JsonNode>(
+            "not",
+            if (groups.size() == 1) {
+                groups.get(0)
+            } else {
+                createObjectNode().set<JsonNode>("anyOf", groups)
+            }
+        )
+    }
 }
 
 private fun buildRequiredGroups(groups: Array<out OpenApiRequiredProperties>): ArrayNode =

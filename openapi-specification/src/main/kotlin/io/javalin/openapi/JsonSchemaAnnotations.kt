@@ -65,6 +65,19 @@ annotation class OpenApiAnyOfProperties(
     vararg val value: OpenApiRequiredProperties
 )
 
+/**
+ * Adds a JSON Schema `not` constraint using property-presence groups.
+ *
+ * <p>A single group becomes a schema of the form `{ "not": { "required": ["..."] } }`. Multiple
+ * groups become `{ "not": { "anyOf": [ ... ] } }`. As with the other property-group annotations,
+ * generated groups also assert the named properties are non-null when present.
+ */
+@Target(CLASS)
+@Retention(RUNTIME)
+annotation class OpenApiNotProperties(
+    vararg val value: OpenApiRequiredProperties
+)
+
 /** A required-property group used by [OpenApiOneOfProperties] and [OpenApiAnyOfProperties]. */
 @Retention(RUNTIME)
 annotation class OpenApiRequiredProperties(
