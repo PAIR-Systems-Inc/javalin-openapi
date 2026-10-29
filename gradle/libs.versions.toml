@@ -1,23 +1,23 @@
 [versions]
 nexus-publish = "2.0.0"
 
-kotlin = "2.3.10"
+kotlin = "2.4.21"
 javalin = "7.2.4"
 
 jackson = "2.22.1"
 jackson-annotations = "2.22"
 
 swagger-parser = "2.1.38"
-swagger-ui = "5.32.8"
+swagger-ui = "5.34.0"
 js-tokens = "8.0.3"
-redoc = "2.5.0"
+redoc = "2.5.4"
 
 jakarta-validation = "3.1.1"
 groovy = "4.0.30"
 mongodb-bson = "5.9.0"
 
 junit = "6.1.1"
-logback = "1.5.37"
+logback = "1.6.5"
 assertj = "3.27.7"
 lombok = "1.18.46"
 json-unit = "6.0.1"

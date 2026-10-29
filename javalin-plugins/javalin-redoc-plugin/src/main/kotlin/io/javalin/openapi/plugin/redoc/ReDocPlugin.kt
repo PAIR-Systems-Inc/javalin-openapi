@@ -25,7 +25,7 @@ class ReDocConfiguration @JvmOverloads constructor(
     /** Custom base path if Javalin is running behind reverse proxy */
     @JvmField var basePath: String? = null,
     /** ReDoc Bundle version */
-    @JvmField var version: String = "2.5.0",
+    @JvmField var version: String = "2.5.4",
     /** ReDoc WebJar route */
     @JvmField var webJarPath: String = "/webjars/redoc",
     /** Custom class loader for loading webjar resources from classpath */
