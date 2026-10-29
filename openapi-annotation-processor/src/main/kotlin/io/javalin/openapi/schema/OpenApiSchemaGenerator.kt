@@ -5,11 +5,13 @@ import io.javalin.openapi.OpenApiOperation.AUTO_GENERATE
 import io.javalin.openapi.experimental.AnnotationProcessorContext
 import io.javalin.openapi.experimental.StructureType.ARRAY
 import io.javalin.openapi.experimental.mirror
+import io.javalin.openapi.experimental.source
 import io.javalin.openapi.experimental.processor.generators.ResultScheme
 import io.javalin.openapi.experimental.processor.shared.getTypeMirror
 import java.util.Locale
 import java.util.TreeMap
 import javax.lang.model.element.Element
+import javax.lang.model.element.ElementKind
 import javax.lang.model.type.TypeMirror
 import javax.tools.Diagnostic.Kind.WARNING
 
@@ -113,6 +115,9 @@ class OpenApiSchemaGenerator(
                         allowedValues = parameterAnnotation.allowedValues.toList(),
                         defaultValue = parameterAnnotation.defaultValue.takeIf { it != NULL_STRING },
                         example = parameterAnnotation.example.takeIf { it.isNotEmpty() },
+                        // An enum (or an array of enums) travels as its plain name, like a string.
+                        // Only parameters that reference structured types are JSON-encoded.
+                        jsonEncoded = paramSchema.references.any { it.source.kind != ElementKind.ENUM },
                     )
                 }
             }

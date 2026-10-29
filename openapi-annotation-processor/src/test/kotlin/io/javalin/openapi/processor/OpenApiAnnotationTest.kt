@@ -6,6 +6,7 @@ import io.javalin.openapi.HttpMethod
 import io.javalin.openapi.OpenApi
 import io.javalin.openapi.OpenApiCallback
 import io.javalin.openapi.OpenApiContent
+import io.javalin.openapi.OpenApiParam
 import io.javalin.openapi.OpenApiRequestBody
 import io.javalin.openapi.OpenApiResponse
 import io.javalin.openapi.processor.specification.OpenApiAnnotationProcessorSpecification
@@ -14,6 +15,34 @@ import net.javacrumbs.jsonunit.assertj.assertThatJson
 import org.junit.jupiter.api.Test
 
 internal class OpenApiAnnotationTest : OpenApiAnnotationProcessorSpecification() {
+
+    enum class SortOrder { ASCENDING, DESCENDING }
+
+    class Sorter(val field: String, val order: SortOrder)
+
+    @OpenApi(
+        path = "/query-params",
+        versions = ["should_keep_enum_query_params_plain_and_json_encode_structured_ones"],
+        queryParams = [
+            OpenApiParam(name = "sortOrder", type = SortOrder::class, defaultValue = "DESCENDING"),
+            OpenApiParam(name = "orders", type = Array<SortOrder>::class),
+            OpenApiParam(name = "sorter", type = Sorter::class),
+        ]
+    )
+    @Test
+    fun should_keep_enum_query_params_plain_and_json_encode_structured_ones() =
+        withOpenApi("should_keep_enum_query_params_plain_and_json_encode_structured_ones") {
+            val params = "$.paths['/query-params'].get.parameters"
+            assertThatJson(it).inPath("$params[0]").isObject.doesNotContainKey("content")
+            assertThatJson(it).inPath("$params[0].schema.\$ref").isEqualTo("#/components/schemas/SortOrder")
+            assertThatJson(it).inPath("$params[0].schema.default").isEqualTo("DESCENDING")
+            assertThatJson(it).inPath("$params[1]").isObject.doesNotContainKey("content")
+            assertThatJson(it).inPath("$params[1].schema.type").isEqualTo("array")
+            assertThatJson(it).inPath("$params[2]").isObject.doesNotContainKey("schema")
+            assertThatJson(it)
+                .inPath("$params[2].content.application/json.schema.\$ref")
+                .isEqualTo("#/components/schemas/Sorter")
+        }
 
     @OpenApi(
         path = "/",
