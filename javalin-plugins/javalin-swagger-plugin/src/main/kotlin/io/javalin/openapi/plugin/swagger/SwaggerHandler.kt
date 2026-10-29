@@ -34,6 +34,7 @@ class SwaggerHandler(
     private val versions: List<SwaggerVersionMapping>,
     private val swaggerVersion: String,
     private val validatorUrl: String?,
+    private val withCredentials: Boolean,
     private val routingPath: String,
     private val basePath: String?,
     private val tagsSorter: String,
@@ -66,7 +67,7 @@ class SwaggerHandler(
         val allCustomStylesheets = customStylesheetFiles
             .joinToString(separator = "\n") { "<link href='${it.first}' rel='stylesheet' media='${it.second}' type='text/css' />" }
         val allCustomJavaScripts = customJavaScriptFiles
-            .joinToString(separator = "\n") { "<script src='${it.first}' type='${it.second}' />"}
+            .joinToString(separator = "\n") { "<script src='${it.first}' type='${it.second}'></script>"}
 
         @Suppress("JSUnresolvedReference")
         @Language("html")
@@ -117,6 +118,7 @@ class SwaggerHandler(
                         layout: "StandaloneLayout",
                         tagsSorter: $tagsSorter,
                         operationsSorter: $operationsSorter,
+                        withCredentials: $withCredentials,
                         validatorUrl: ${if (validatorUrl != null) "\"$validatorUrl\"" else "null"}
                       })
                 }

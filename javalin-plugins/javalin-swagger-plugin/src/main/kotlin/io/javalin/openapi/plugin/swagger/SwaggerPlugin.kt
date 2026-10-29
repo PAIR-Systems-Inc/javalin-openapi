@@ -26,6 +26,8 @@ class SwaggerConfiguration @JvmOverloads constructor(
     @JvmField var title: String = "OpenApi documentation",
     /** Specification validator */
     @JvmField var validatorUrl: String? = "https://validator.swagger.io/validator",
+    /** Enables passing credentials, such as cookies, in CORS requests that are sent by the browser. */
+    @JvmField var withCredentials: Boolean = false,
     /** Tags sorter algorithm expression. */
     @JvmField var tagsSorter: String = "'alpha'",
     /** Operations sorter algorithm expression. */
@@ -36,6 +38,8 @@ class SwaggerConfiguration @JvmOverloads constructor(
     @JvmField var customStylesheetFiles: MutableList<Pair<String, String>> = arrayListOf(),
     /** Custom JavaScript files to be injected into Swagger HTML */
     @JvmField var customJavaScriptFiles: MutableList<Pair<String, String>> = arrayListOf(),
+    /** Custom class loader for loading generated OpenAPI resources from classpath */
+    @JvmField var resourceClassLoader: ClassLoader? = null,
 ) {
 
     /** Set the location of OpenApi documentation */
@@ -62,6 +66,10 @@ class SwaggerConfiguration @JvmOverloads constructor(
     /** Set specification validator URL */
     fun withValidatorUrl(url: String?): SwaggerConfiguration = also { validatorUrl = url }
 
+    /** Enable passing credentials in CORS requests */
+    @JvmOverloads
+    fun withCredentials(enabled: Boolean = true): SwaggerConfiguration = also { withCredentials = enabled }
+
     /** Set tags sorter algorithm expression */
     fun withTagsSorter(sorter: String): SwaggerConfiguration = also { tagsSorter = sorter }
 
@@ -84,6 +92,11 @@ class SwaggerConfiguration @JvmOverloads constructor(
     fun injectCustomVersion(name: String, url: String): SwaggerConfiguration = also {
         customVersions.add(name to url)
     }
+
+    /** Set custom class loader for loading generated OpenAPI resources from classpath */
+    fun withResourceClassLoader(classLoader: ClassLoader): SwaggerConfiguration = also {
+        resourceClassLoader = classLoader
+    }
 }
 
 open class SwaggerPlugin @JvmOverloads constructor(
@@ -93,10 +106,10 @@ open class SwaggerPlugin @JvmOverloads constructor(
     override fun repeatable(): Boolean = true
 
     override fun onStart(state: JavalinState) {
-        val openApiLoader = OpenApiLoader()
-        val versions = openApiLoader.loadVersions().map {
-            SwaggerVersionMapping.OpenApiLoader(name = it)
-        }
+        val openApiLoader = OpenApiLoader(pluginConfig.resourceClassLoader ?: OpenApiLoader::class.java.classLoader)
+        val versions = openApiLoader.loadVersions()
+            .ifEmpty { setOf("default") }
+            .map { SwaggerVersionMapping.OpenApiLoader(name = it) }
 
         val swaggerHandler = SwaggerHandler(
             title = pluginConfig.title,
@@ -106,6 +119,7 @@ open class SwaggerPlugin @JvmOverloads constructor(
             },
             swaggerVersion = pluginConfig.version,
             validatorUrl = pluginConfig.validatorUrl,
+            withCredentials = pluginConfig.withCredentials,
             routingPath = state.router.contextPath,
             basePath = pluginConfig.basePath,
             tagsSorter = pluginConfig.tagsSorter,
@@ -128,10 +142,11 @@ open class SwaggerPlugin @JvmOverloads constructor(
             /** Register webjar handler if and only if there isn't already a [SwaggerWebJarHandler] at configured route */
             state.internalRouter
                 .findHttpHandlerEntries(GET, "${pluginConfig.webJarPath}/*")
-                .takeIf { routes -> routes.noneMatch { it.endpoint is SwaggerEndpoint } }
+                .takeIf { routes -> routes.none { it.endpoint is SwaggerEndpoint } }
                 ?.run {
                     val swaggerWebJarHandler = SwaggerWebJarHandler(
-                        swaggerWebJarPath = pluginConfig.webJarPath
+                        swaggerWebJarPath = pluginConfig.webJarPath,
+                        classLoader = pluginConfig.resourceClassLoader ?: SwaggerWebJarHandler::class.java.classLoader
                     )
                     router.addEndpoint(
                         SwaggerEndpoint(
